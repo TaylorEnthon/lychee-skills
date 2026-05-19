@@ -1,0 +1,382 @@
+{
+    "default_female":  {
+                           "name":  "默认女声",
+                           "instruct":  "女，青年，中音调",
+                           "speaker_id":  "08139399-2093-4f06-99be-0fec1f08b064"
+                       },
+    "default_male":  {
+                         "name":  "默认男声",
+                         "instruct":  "男，青年，中音调",
+                         "speaker_id":  "162b45d9-c5d5-4f6a-ac0a-e1a00908688e"
+                     },
+    "gentle_female":  {
+                          "name":  "温柔女声",
+                          "instruct":  "女，青年，中音调",
+                          "speaker_id":  "432a8d86-6192-49e0-bfb5-58f4eaa13eff"
+                      },
+    "gentle_sister":  {
+                          "name":  "温柔姐姐",
+                          "instruct":  "女，青年，中音调",
+                          "speaker_id":  "60f703d5-7a93-43aa-9e50-28579a4168f8"
+                      },
+    "intellectual_female":  {
+                                "name":  "知性女声",
+                                "instruct":  "女，中年，中音调",
+                                "speaker_id":  "df0b22d2-6212-4dc2-a8fc-91bd1c4b8382"
+                            },
+    "mature_female":  {
+                          "name":  "成熟女声",
+                          "instruct":  "女，中年，中音调",
+                          "speaker_id":  "e0e59bd8-c662-49d7-bde8-995e8882598e"
+                      },
+    "sweet_female":  {
+                         "name":  "甜美女声",
+                         "instruct":  "女，青年，高音调",
+                         "speaker_id":  "48f0acbf-0047-428c-836d-ac9114fc2dcc"
+                     },
+    "cute_female":  {
+                        "name":  "可爱女声",
+                        "instruct":  "女，青年，高音调",
+                        "speaker_id":  "3dd40843-1431-4bb0-b00a-9ba71653dfa6"
+                    },
+    "girl_voice":  {
+                       "name":  "少女音",
+                       "instruct":  "女，少年，高音调",
+                       "speaker_id":  "8fb13fdb-373c-4945-9350-fd3b0742dfc1"
+                   },
+    "loli_voice":  {
+                       "name":  "萝莉音",
+                       "instruct":  "女，少年，极高音调",
+                       "speaker_id":  "d8092a5a-b42c-4022-9e6c-0d1e65cba5b0"
+                   },
+    "energetic_girl":  {
+                           "name":  "元气少女",
+                           "instruct":  "女，少年，高音调",
+                           "speaker_id":  "e5625148-b3e5-485f-90ae-40679a149001"
+                       },
+    "queen_female":  {
+                         "name":  "御姐音",
+                         "instruct":  "女，青年，低音调",
+                         "speaker_id":  "74420a40-f645-41c3-aae3-68daa7d8ac60"
+                     },
+    "deep_female":  {
+                        "name":  "低沉女声",
+                        "instruct":  "女，中年，低音调",
+                        "speaker_id":  "926d7e70-d6ea-4249-a785-a2ed0cb3b967"
+                    },
+    "cool_female":  {
+                        "name":  "冷艳女声",
+                        "instruct":  "女，青年，低音调",
+                        "speaker_id":  "ae2e0609-b0c1-4c05-b4ed-b0c746d33acf"
+                    },
+    "old_grandma":  {
+                        "name":  "老奶奶声音",
+                        "instruct":  "女，老年，低音调",
+                        "speaker_id":  "951ef807-00fd-4426-96cf-3db76f7ddf96"
+                    },
+    "grandma_voice":  {
+                          "name":  "奶奶音",
+                          "instruct":  "女，老年，中音调",
+                          "speaker_id":  "6b8bfc20-cdfc-4f14-9aa7-e8a846fdf9e8"
+                      },
+    "young_male":  {
+                       "name":  "青年男声",
+                       "instruct":  "男，青年，中音调",
+                       "speaker_id":  "63e307a1-2f90-4fdf-a86b-8faf054f5e5e"
+                   },
+    "normal_male":  {
+                        "name":  "正常男声",
+                        "instruct":  "男，青年，中音调",
+                        "speaker_id":  "9e213d4d-dfe4-4377-a318-79f9e5cee883"
+                    },
+    "sunny_male":  {
+                       "name":  "阳光男声",
+                       "instruct":  "男，青年，中音调",
+                       "speaker_id":  "84e6c211-5898-430d-853c-d99a64532f2f"
+                   },
+    "deep_male":  {
+                      "name":  "低沉男声",
+                      "instruct":  "男，中年，低音调",
+                      "speaker_id":  "0c293d16-b9c3-4e6a-8e6a-5e1349df01e4"
+                  },
+    "magnetic_male":  {
+                          "name":  "磁性男声",
+                          "instruct":  "男，中年，低音调",
+                          "speaker_id":  "9a694880-66eb-4f78-8e4d-a35e91c1111e"
+                      },
+    "uncle_voice":  {
+                        "name":  "大叔音",
+                        "instruct":  "男，中年，低音调",
+                        "speaker_id":  "f0093dc9-e54c-4e3c-a1fd-bf9d719b191e"
+                    },
+    "boss_male":  {
+                      "name":  "霸道总裁音",
+                      "instruct":  "男，中年，低音调",
+                      "speaker_id":  "496ec437-05ed-4748-a715-1ede1d59e388"
+                  },
+    "boy_voice":  {
+                      "name":  "少年音",
+                      "instruct":  "男，少年，高音调",
+                      "speaker_id":  "71321e27-d513-47e2-8143-f2404c77568d"
+                  },
+    "fresh_boy":  {
+                      "name":  "清爽少年音",
+                      "instruct":  "男，少年，高音调",
+                      "speaker_id":  "2525fea8-4cd1-4d03-8460-0d32be22f53c"
+                  },
+    "old_grandpa":  {
+                        "name":  "老爷爷声音",
+                        "instruct":  "男，老年，低音调",
+                        "speaker_id":  "94c9991e-0266-4137-b9b9-ec351fd49a9f"
+                    },
+    "grandpa_voice":  {
+                          "name":  "爷爷音",
+                          "instruct":  "男，老年，中音调",
+                          "speaker_id":  "86186a81-de7d-41fb-a113-58f8261d73cf"
+                      },
+    "child_voice":  {
+                        "name":  "儿童声",
+                        "instruct":  "儿童，高音调",
+                        "speaker_id":  "7f608962-6245-4f51-ab71-1102d4d6e2f5"
+                    },
+    "kid_voice":  {
+                      "name":  "小孩声音",
+                      "instruct":  "儿童，高音调",
+                      "speaker_id":  "a650b449-558c-41e7-b134-61511d7c7633"
+                  },
+    "little_girl":  {
+                        "name":  "小女孩声音",
+                        "instruct":  "女，儿童，高音调",
+                        "speaker_id":  "085cd3ee-7772-4a1f-a248-c017fae3ace4"
+                    },
+    "little_boy":  {
+                       "name":  "小男孩声音",
+                       "instruct":  "男，儿童，高音调",
+                       "speaker_id":  "1d0892b0-157b-4b47-9a52-902e81919dbe"
+                   },
+    "high_female":  {
+                        "name":  "高音女声",
+                        "instruct":  "女，青年，高音调",
+                        "speaker_id":  "f67fd4ec-e565-471d-96c5-6e3a0ca1bdb0"
+                    },
+    "very_high_female":  {
+                             "name":  "超高音女声",
+                             "instruct":  "女，青年，极高音调",
+                             "speaker_id":  "0fb1d1a8-b298-4326-8b35-92ba93cd6683"
+                         },
+    "low_male":  {
+                     "name":  "低音男声",
+                     "instruct":  "男，中年，低音调",
+                     "speaker_id":  "15a3fd99-d624-467a-89ce-fba64e3f9e7b"
+                 },
+    "very_low_male":  {
+                          "name":  "超低音男声",
+                          "instruct":  "男，中年，极低音调",
+                          "speaker_id":  "8d708df0-00c7-41c0-944f-173f5e15b4bd"
+                      },
+    "whisper_female":  {
+                           "name":  "耳语女声",
+                           "instruct":  "女，青年，耳语",
+                           "speaker_id":  "d9b2bd1d-1c30-4131-ad1a-a3e35469c7de"
+                       },
+    "whisper_male":  {
+                         "name":  "耳语男声",
+                         "instruct":  "男，青年，耳语",
+                         "speaker_id":  "ea068cc2-9bf1-4d4b-a4ca-09b6d6cdb01f"
+                     },
+    "soft_whisper_female":  {
+                                "name":  "悄悄话女声",
+                                "instruct":  "女，青年，耳语",
+                                "speaker_id":  "9062d0db-cf02-465f-91d0-ca66fc8e4e9f"
+                            },
+    "soft_whisper_male":  {
+                              "name":  "悄悄话男声",
+                              "instruct":  "男，青年，耳语",
+                              "speaker_id":  "c86aaca0-1bfc-4f6f-8ddb-3e1a7edad3b0"
+                          },
+    "sichuan_female":  {
+                           "name":  "四川话女声",
+                           "instruct":  "女，青年，中音调，四川话",
+                           "speaker_id":  "99667466-0da3-4dcd-a92a-3002912b8d30"
+                       },
+    "sichuan_girl":  {
+                         "name":  "四川女生",
+                         "instruct":  "女，青年，中音调，四川话",
+                         "speaker_id":  "a9a5ac94-d2e7-43bb-bb0f-03e578b6c799"
+                     },
+    "sichuan_sister":  {
+                           "name":  "四川妹子",
+                           "instruct":  "女，青年，中音调，四川话",
+                           "speaker_id":  "6ebe02ca-7630-41d9-bf1a-28f1e8a0512a"
+                       },
+    "sichuan_male":  {
+                         "name":  "四川话男声",
+                         "instruct":  "男，中年，中音调，四川话",
+                         "speaker_id":  "f0bcd886-9e05-497b-a69e-c7fbb21c108b"
+                     },
+    "sichuan_uncle":  {
+                          "name":  "四川大叔",
+                          "instruct":  "男，中年，低音调，四川话",
+                          "speaker_id":  "c4890432-7487-47eb-a7a5-8b3f1bf0d15c"
+                      },
+    "dongbei_male":  {
+                         "name":  "东北话男声",
+                         "instruct":  "男，中年，中音调，东北话",
+                         "speaker_id":  "5f7c0d83-8108-4bf2-b0de-a53eda4cd813"
+                     },
+    "dongbei_bro":  {
+                        "name":  "东北老铁",
+                        "instruct":  "男，中年，中音调，东北话",
+                        "speaker_id":  "48fb84fc-4720-48ef-8abc-5be9264ff980"
+                    },
+    "dongbei_female":  {
+                           "name":  "东北话女声",
+                           "instruct":  "女，青年，中音调，东北话",
+                           "speaker_id":  "30df2b9c-b168-4765-917c-78e5d55a95d6"
+                       },
+    "henan_male":  {
+                       "name":  "河南话男声",
+                       "instruct":  "男，中年，中音调，河南话",
+                       "speaker_id":  "3d778f46-c1e6-4fdc-80b1-b92d6541ada8"
+                   },
+    "henan_uncle":  {
+                        "name":  "河南大叔",
+                        "instruct":  "男，中年，低音调，河南话",
+                        "speaker_id":  "1c70be3d-f3d8-4363-a982-c904a1a698e5"
+                    },
+    "henan_female":  {
+                         "name":  "河南话女声",
+                         "instruct":  "女，青年，中音调，河南话",
+                         "speaker_id":  "e43faead-3847-44d7-992d-021e920a776f"
+                     },
+    "shaanxi_male":  {
+                         "name":  "陕西话男声",
+                         "instruct":  "男，中年，中音调，陕西话",
+                         "speaker_id":  "ce48f456-6d5b-4a0c-91ad-5287a320ae27"
+                     },
+    "shaanxi_female":  {
+                           "name":  "陕西话女声",
+                           "instruct":  "女，青年，中音调，陕西话",
+                           "speaker_id":  "994e5274-4c61-4bf5-bdf1-90dca9c4cdcc"
+                       },
+    "guizhou_female":  {
+                           "name":  "贵州话女声",
+                           "instruct":  "女，青年，中音调，贵州话",
+                           "speaker_id":  "b06dd943-d0e9-4669-a0ea-d13dd78c284f"
+                       },
+    "guizhou_male":  {
+                         "name":  "贵州话男声",
+                         "instruct":  "男，中年，中音调，贵州话",
+                         "speaker_id":  "3ffd44f7-f6ee-47cd-9133-3dd27efa3c31"
+                     },
+    "yunnan_female":  {
+                          "name":  "云南话女声",
+                          "instruct":  "女，青年，中音调，云南话",
+                          "speaker_id":  "6053862b-a9aa-43a7-b925-ccf196edd8f6"
+                      },
+    "yunnan_male":  {
+                        "name":  "云南话男声",
+                        "instruct":  "男，中年，中音调，云南话",
+                        "speaker_id":  "03b76ab5-2246-4e26-bc72-4342b637ba32"
+                    },
+    "gansu_male":  {
+                       "name":  "甘肃话男声",
+                       "instruct":  "男，中年，中音调，甘肃话",
+                       "speaker_id":  "2495dcb9-3408-49a4-a625-eccab35637c9"
+                   },
+    "gansu_female":  {
+                         "name":  "甘肃话女声",
+                         "instruct":  "女，青年，中音调，甘肃话",
+                         "speaker_id":  "b9bc6ec9-6f1c-4e16-a9fb-4c68f01ac566"
+                     },
+    "ningxia_male":  {
+                         "name":  "宁夏话男声",
+                         "instruct":  "男，中年，中音调，宁夏话",
+                         "speaker_id":  "4ba7508b-8684-4ba8-a9ec-956159956930"
+                     },
+    "ningxia_female":  {
+                           "name":  "宁夏话女声",
+                           "instruct":  "女，青年，中音调，宁夏话",
+                           "speaker_id":  "1ba5c1a8-b1bb-47bf-bad1-94fa5e9b7583"
+                       },
+    "qingdao_male":  {
+                         "name":  "青岛话男声",
+                         "instruct":  "男，中年，中音调，青岛话",
+                         "speaker_id":  "8580c8c7-1d9f-4cb1-b9e1-86f82525a73a"
+                     },
+    "qingdao_female":  {
+                           "name":  "青岛话女声",
+                           "instruct":  "女，青年，中音调，青岛话",
+                           "speaker_id":  "739ccb5b-3699-4ece-823b-36cb56ecaf2c"
+                       },
+    "shijiazhuang_male":  {
+                              "name":  "石家庄话男声",
+                              "instruct":  "男，中年，中音调，石家庄话",
+                              "speaker_id":  "15d4b209-395d-459b-9e22-61fd775a341e"
+                          },
+    "shijiazhuang_female":  {
+                                "name":  "石家庄话女声",
+                                "instruct":  "女，青年，中音调，石家庄话",
+                                "speaker_id":  "790dd793-b537-4504-a486-df0d1caba481"
+                            },
+    "jinan_male":  {
+                       "name":  "济南话男声",
+                       "instruct":  "男，中年，中音调，济南话",
+                       "speaker_id":  "3ea88c6f-f91c-41f0-8461-101f7293291f"
+                   },
+    "jinan_female":  {
+                         "name":  "济南话女声",
+                         "instruct":  "女，青年，中音调，济南话",
+                         "speaker_id":  "d81dd1eb-cea1-42c0-95c8-490c5f8a0da7"
+                     },
+    "guilin_male":  {
+                        "name":  "桂林话男声",
+                        "instruct":  "男，中年，中音调，桂林话",
+                        "speaker_id":  "b1bd723a-b32a-4304-b1eb-5d1125278881"
+                    },
+    "guilin_female":  {
+                          "name":  "桂林话女声",
+                          "instruct":  "女，青年，中音调，桂林话",
+                          "speaker_id":  "b0455a41-bbc9-4001-a601-41a356a420df"
+                      },
+    "support_female":  {
+                           "name":  "客服女声",
+                           "instruct":  "女，中年，中音调",
+                           "speaker_id":  "6b90cd1f-6f7b-4311-933f-9d24b00fb4cc"
+                       },
+    "support_male":  {
+                         "name":  "客服男声",
+                         "instruct":  "男，中年，中音调",
+                         "speaker_id":  "c6d4c821-0623-4d0f-84f0-265977591713"
+                     },
+    "announcer_female":  {
+                             "name":  "播音员女声",
+                             "instruct":  "女，中年，中音调",
+                             "speaker_id":  "a1d6988c-055e-41ba-8dbf-50e99ebb53ad"
+                         },
+    "announcer_male":  {
+                           "name":  "播音员男声",
+                           "instruct":  "男，中年，中音调",
+                           "speaker_id":  "a51408b9-d0fc-49c0-91f5-0b78eda2d2aa"
+                       },
+    "documentary_male":  {
+                             "name":  "纪录片男声",
+                             "instruct":  "男，中年，低音调",
+                             "speaker_id":  "96ef9ace-2ed4-4c39-b06a-9632ef622a9d"
+                         },
+    "narration_male":  {
+                           "name":  "旁白男声",
+                           "instruct":  "男，中年，低音调",
+                           "speaker_id":  "ac1ff228-a5ba-49d2-9ab3-82a8e569e745"
+                       },
+    "sleep_female":  {
+                         "name":  "助眠女声",
+                         "instruct":  "女，青年，耳语",
+                         "speaker_id":  "b717d79b-0cdb-47f7-a609-449e6b5a5824"
+                     },
+    "sleep_male":  {
+                       "name":  "助眠男声",
+                       "instruct":  "男，青年，耳语",
+                       "speaker_id":  "629cdd3c-49ee-4ff2-bafe-0725dc547cd7"
+                   }
+}
