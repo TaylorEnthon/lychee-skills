@@ -24,13 +24,13 @@ python -m pip install websocket-client
 
 ## 安装
 
-### 方式一：一键安装（Claude Code）
+### 方式一：一键安装
 
 ```bash
 npx skills add TaylorEnthon/lychee-skills --skill tts-lychee
 ```
 
-安装完成后重启 Claude Code，即可使用 `/tts-lychee` 命令。如需辅助命令（`/tts-lychee-preview-match`、`/tts-lychee-list-voices`），请使用方式二手动安装。
+安装完成后重启 AI 客户端，即可使用 `/tts-lychee` 等命令。
 
 ### 方式二：手动安装完整命令集
 
