@@ -42,7 +42,7 @@ python3 -m pip install websocket-client
 用户说“检查 tts-lychee 安装”或合成失败时，先运行离线自检，不要展示 API Key：
 
 ```bash
-python3 {baseDir}/tts_client.py --doctor
+python3 {baseDir}/scripts/tts_client.py --doctor
 ```
 
 Windows 也可以运行已安装目录里的 `doctor.ps1`。自检只检查 Python、依赖、环境变量是否存在、数据文件和别名匹配，不会合成音频或扣费。
@@ -74,7 +74,7 @@ Windows 也可以运行已安装目录里的 `doctor.ps1`。自检只检查 Pyth
 
 ## 正常调用规则
 
-- 直接调用 `tts_client.py` 生成 mp3；不要为了确认别名、音色或实现细节去运行 `grep`、`cat`、`Select-String`、`Get-Content` 等源码/配置检查命令。
+- 直接调用 `{baseDir}/scripts/tts_client.py` 生成 mp3；不要为了确认别名、音色或实现细节去运行 `grep`、`cat`、`Select-String`、`Get-Content` 等源码/配置检查命令。
 - 不要把内部检查过程、命令行细节、环境变量值、源码路径、JSON 调试字段展示给最终用户。
 - 不要在 Bash/PowerShell 命令里写 `TTS_API_KEY=...`、`export TTS_API_KEY=...` 或任何真实 API Key；只调用客户端，让它从已配置环境变量读取。
 - 只有用户明确要求“排查/调试/检查安装/查看配置”时，才可以执行诊断命令；诊断回复也不要展示 API Key。
@@ -82,13 +82,13 @@ Windows 也可以运行已安装目录里的 `doctor.ps1`。自检只检查 Pyth
 ## 内部执行
 
 ```bash
-python3 {baseDir}/tts_client.py --text "欢迎使用短剧翻译平台" --voice "温柔女声"
+python3 {baseDir}/scripts/tts_client.py --text "欢迎使用短剧翻译平台" --voice "温柔女声"
 ```
 
 指定输出文件：
 
 ```bash
-python3 {baseDir}/tts_client.py --text "这是一段旁白" --voice "播音员男声" --output ./narration.mp3
+python3 {baseDir}/scripts/tts_client.py --text "这是一段旁白" --voice "播音员男声" --output ./narration.mp3
 ```
 
 ## 音色匹配
