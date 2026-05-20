@@ -76,6 +76,17 @@ def load_optional_json(name: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+def resolve_speaker_id(preset: Dict[str, Any]) -> str:
+    speaker_ref = preset.get("speaker_ref")
+    if isinstance(speaker_ref, str) and speaker_ref:
+        encoded = speaker_ref[4:] if speaker_ref.startswith("b64:") else speaker_ref
+        return base64.b64decode(encoded).decode("utf-8")
+    speaker_id = preset.get("speaker_id")
+    if isinstance(speaker_id, str) and speaker_id:
+        return speaker_id
+    raise ValueError("preset is missing speaker reference")
+
+
 def resolve_voice_id(
     user_voice: Optional[str],
     alias_map: Dict[str, str],
@@ -247,7 +258,7 @@ def synthesize(text: str, voice: Optional[str] = None, timeout: int = 90) -> Dic
     voice_aliases = load_optional_json("voice_aliases.json")
     voice_id, used_default, matched_alias = resolve_voice_id(voice, alias_map, presets, voice_aliases)
     preset = presets[voice_id]
-    speaker_id = preset["speaker_id"]
+    speaker_id = resolve_speaker_id(preset)
 
     ws_url = os.getenv("TTS_WS_URL", DEFAULT_WS_URL)
     session_id = uuid.uuid4().hex

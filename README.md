@@ -193,7 +193,6 @@ lychee-skills/
         └── data/
             ├── alias_map.json
             ├── presets.json
-            ├── speaker_ids.json
             └── voice_aliases.json
 ```
 
