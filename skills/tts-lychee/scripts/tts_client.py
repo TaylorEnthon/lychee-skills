@@ -377,17 +377,55 @@ def run_doctor() -> Dict[str, Any]:
     def add(name: str, ok: bool, detail: str = "") -> None:
         checks.append({"name": name, "ok": ok, "detail": detail})
 
+    def has_required_preset_fields(preset: Any) -> bool:
+        return (
+            isinstance(preset, dict)
+            and isinstance(preset.get("name"), str)
+            and bool(preset.get("name"))
+            and bool(preset.get("speaker_ref") or preset.get("speaker_id"))
+        )
+
     add("python", sys.version_info >= (3, 8), f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     add("websocket-client", websocket is not None, "installed" if websocket is not None else "missing: python -m pip install websocket-client")
     add("TTS_API_KEY", bool(os.getenv("TTS_API_KEY")), "set" if os.getenv("TTS_API_KEY") else "missing")
 
     try:
         alias_map, presets, voice_aliases = load_voice_data()
-        add("alias_map.json", len(alias_map) >= 371, f"{len(alias_map)} aliases")
-        add("presets.json", len(presets) >= 371, f"{len(presets)} presets")
-        add("voice_aliases.json", len(voice_aliases) >= 1, f"{len(voice_aliases)} voice groups")
-        voice_id, used_default, matched_alias = resolve_voice_id("性感女声", alias_map, presets, voice_aliases)
-        add("voice matching", voice_id == "性感女声" and not used_default, f"性感女声 -> {voice_id} ({matched_alias})")
+        add(
+            "data files",
+            isinstance(alias_map, dict) and isinstance(presets, dict) and isinstance(voice_aliases, dict),
+            f"{len(presets)} presets, {len(alias_map)} aliases, {len(voice_aliases)} voice groups",
+        )
+
+        required_voices = ["默认女声", "默认男声", "性感女声", "小男孩声音", "云南话男声"]
+        missing_voices = [
+            voice_id
+            for voice_id in required_voices
+            if voice_id not in presets or not has_required_preset_fields(presets[voice_id])
+        ]
+        add(
+            "core voices",
+            not missing_voices,
+            "ok" if not missing_voices else "missing or invalid: " + ", ".join(missing_voices),
+        )
+
+        broken_aliases = [
+            alias
+            for alias in ["默认女声", "默认男声", "性感女声", "小男孩声音", "云南话男声"]
+            if alias_map.get(alias) not in presets
+        ]
+        add(
+            "core aliases",
+            not broken_aliases,
+            "ok" if not broken_aliases else "broken: " + ", ".join(broken_aliases),
+        )
+
+        voice_id, used_default, matched_alias = resolve_voice_id("性感的女声", alias_map, presets, voice_aliases)
+        add(
+            "voice matching",
+            voice_id == "性感女声" and not used_default,
+            f"性感的女声 -> {voice_id} ({matched_alias})",
+        )
     except Exception as exc:
         add("data files", False, str(exc))
 

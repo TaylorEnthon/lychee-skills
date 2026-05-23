@@ -166,6 +166,9 @@ lychee-skills/
 ├── LICENSE
 ├── install.ps1
 ├── install.sh
+├── .github/
+│   └── workflows/
+│       └── installers.yml
 ├── commands/
 │   ├── tts-lychee-preview-match.md
 │   └── tts-lychee-list-voices.md
