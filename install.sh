@@ -9,6 +9,20 @@ COMMAND_SOURCE_DIR="$SOURCE_DIR/commands"
 COMMAND_TARGET_DIR="$CLAUDE_HOME/commands"
 LEGACY_COMMAND="$COMMAND_TARGET_DIR/tts-lychee.md"
 
+for required_source_path in \
+  "$SKILL_SOURCE/SKILL.md" \
+  "$SKILL_SOURCE/doctor.ps1" \
+  "$SKILL_SOURCE/doctor.sh" \
+  "$SKILL_SOURCE/scripts" \
+  "$SKILL_SOURCE/data" \
+  "$COMMAND_SOURCE_DIR/tts-lychee-preview-match.md" \
+  "$COMMAND_SOURCE_DIR/tts-lychee-list-voices.md"; do
+  if [ ! -e "$required_source_path" ]; then
+    echo "Required source path is missing: $required_source_path" >&2
+    exit 1
+  fi
+done
+
 mkdir -p "$SKILL_TARGET" "$COMMAND_TARGET_DIR"
 cp "$SKILL_SOURCE/SKILL.md" "$SKILL_SOURCE/doctor.ps1" "$SKILL_SOURCE/doctor.sh" "$SKILL_TARGET/"
 cp -R "$SKILL_SOURCE/scripts" "$SKILL_SOURCE/data" "$SKILL_TARGET/"
@@ -21,5 +35,5 @@ if [ -f "$LEGACY_COMMAND" ]; then
 fi
 
 echo "Installed skill: $SKILL_TARGET"
-echo "Restart Claude Code, then use: /tts-lychee 你好，欢迎使用短剧翻译平台。"
+echo "Restart Claude Code, then use: /tts-lychee <text to synthesize>"
 echo "Set TTS_API_KEY before use. Get an API Key from https://shanhaistudio.lycheeai.com.cn/"

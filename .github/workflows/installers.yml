@@ -1,0 +1,55 @@
+name: Installers
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $claudeHome = Join-Path $env:RUNNER_TEMP "claude-winps"
+          .\install.ps1 -ClaudeHome $claudeHome
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills\tts-lychee\SKILL.md"))) {
+            throw "Skill was not installed by Windows PowerShell."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands\tts-lychee-list-voices.md"))) {
+            throw "List voices command was not installed by Windows PowerShell."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands\tts-lychee-preview-match.md"))) {
+            throw "Preview match command was not installed by Windows PowerShell."
+          }
+
+      - name: Install with PowerShell 7
+        shell: pwsh
+        run: |
+          $claudeHome = Join-Path $env:RUNNER_TEMP "claude-pwsh"
+          ./install.ps1 -ClaudeHome $claudeHome
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills/tts-lychee/SKILL.md"))) {
+            throw "Skill was not installed by PowerShell 7."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands/tts-lychee-list-voices.md"))) {
+            throw "List voices command was not installed by PowerShell 7."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands/tts-lychee-preview-match.md"))) {
+            throw "Preview match command was not installed by PowerShell 7."
+          }
+
+  bash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install with bash
+        shell: bash
+        run: |
+          export CLAUDE_HOME="$RUNNER_TEMP/claude-bash"
+          bash ./install.sh
+          test -f "$CLAUDE_HOME/skills/tts-lychee/SKILL.md"
+          test -f "$CLAUDE_HOME/commands/tts-lychee-list-voices.md"
+          test -f "$CLAUDE_HOME/commands/tts-lychee-preview-match.md"

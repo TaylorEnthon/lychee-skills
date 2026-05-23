@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover
     websocket = None
 
 DEFAULT_WS_URL = "wss://shanhaistudio.lycheeai.com.cn/openapi/tts/ws_binary/v2"
-DEFAULT_VOICE_ID = "default_female"
+DEFAULT_VOICE_ID = "默认女声"
 
 PROTOCOL_VERSION = 0b0001
 DEFAULT_HEADER_SIZE = 0b0001
@@ -87,6 +87,10 @@ def resolve_speaker_id(preset: Dict[str, Any]) -> str:
     raise ValueError("preset is missing speaker reference")
 
 
+def supports_contains_matching(preset: Dict[str, Any]) -> bool:
+    return preset.get("match_mode", "normal") != "exact"
+
+
 def resolve_voice_id(
     user_voice: Optional[str],
     alias_map: Dict[str, str],
@@ -104,12 +108,13 @@ def resolve_voice_id(
 
     # Prefer longer official aliases so specific names win before shorter overlapping names.
     for alias in sorted(alias_map.keys(), key=len, reverse=True):
-        if alias in voice:
-            return alias_map[alias], False, alias
+        voice_id = alias_map[alias]
+        if alias in voice and voice_id in presets and supports_contains_matching(presets[voice_id]):
+            return voice_id, False, alias
 
     expanded_aliases = []
     for voice_id, aliases in (voice_aliases or {}).items():
-        if voice_id not in presets or not isinstance(aliases, list):
+        if voice_id not in presets or not isinstance(aliases, list) or not supports_contains_matching(presets[voice_id]):
             continue
         for alias in aliases:
             if isinstance(alias, str) and alias:
@@ -144,12 +149,15 @@ def resolve_voice_id(
         (("低沉", "女"), "低沉女声"),
         (("甜", "女"), "甜美女声"),
         (("温柔",), "温柔女声"),
-        (("男",), "默认男声"),
-        (("女",), "默认女声"),
     ]
     for keywords, alias in keyword_rules:
         if all(keyword in voice for keyword in keywords) and alias in alias_map:
             return alias_map[alias], False, alias
+
+    if "男" in voice and "默认男声" in alias_map:
+        return alias_map["默认男声"], True, None
+    if "女" in voice and "默认女声" in alias_map:
+        return alias_map["默认女声"], True, None
 
     return DEFAULT_VOICE_ID, True, None
 
@@ -343,18 +351,24 @@ def preview_match(voice: Optional[str]) -> Dict[str, Any]:
     return result
 
 
-def list_voices() -> Dict[str, Any]:
-    categories = [
-        ("默认", ["默认女声", "默认男声"]),
-        ("女声", ["温柔女声", "温柔姐姐", "知性女声", "成熟女声", "甜美女声", "可爱女声", "少女音", "萝莉音", "元气少女", "御姐音", "低沉女声", "冷艳女声", "老奶奶声音", "奶奶音"]),
-        ("男声", ["青年男声", "正常男声", "阳光男声", "低沉男声", "磁性男声", "大叔音", "霸道总裁音", "少年音", "清爽少年音", "老爷爷声音", "爷爷音"]),
-        ("儿童", ["儿童声", "小孩声音", "小女孩声音", "小男孩声音"]),
-        ("高低音", ["高音女声", "超高音女声", "低音男声", "超低音男声"]),
-        ("耳语", ["耳语女声", "耳语男声", "悄悄话女声", "悄悄话男声"]),
-        ("方言", ["四川话女声", "四川女生", "四川妹子", "四川话男声", "四川大叔", "东北话男声", "东北老铁", "东北话女声", "河南话男声", "河南大叔", "河南话女声", "陕西话男声", "陕西话女声", "贵州话女声", "贵州话男声", "云南话女声", "云南话男声", "甘肃话男声", "甘肃话女声", "宁夏话男声", "宁夏话女声", "青岛话男声", "青岛话女声", "石家庄话男声", "石家庄话女声", "济南话男声", "济南话女声", "桂林话男声", "桂林话女声"]),
-        ("用途", ["客服女声", "客服男声", "播音员女声", "播音员男声", "纪录片男声", "旁白男声", "助眠女声", "助眠男声"]),
-    ]
-    return {"success": True, "categories": [{"name": name, "voices": voices} for name, voices in categories]}
+def list_voices(presets: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    voice_presets = presets or load_json("presets.json")
+    categories = []
+    category_map = {}
+
+    for preset in voice_presets.values():
+        if not preset.get("listable", True):
+            continue
+        category = preset.get("category", "扩展")
+        if category not in category_map:
+            category_map[category] = []
+            categories.append(category)
+        category_map[category].append(preset["name"])
+
+    return {
+        "success": True,
+        "categories": [{"name": name, "voices": category_map[name]} for name in categories],
+    }
 
 
 def run_doctor() -> Dict[str, Any]:
@@ -369,11 +383,11 @@ def run_doctor() -> Dict[str, Any]:
 
     try:
         alias_map, presets, voice_aliases = load_voice_data()
-        add("alias_map.json", len(alias_map) >= 76, f"{len(alias_map)} aliases")
-        add("presets.json", len(presets) >= 76, f"{len(presets)} presets")
+        add("alias_map.json", len(alias_map) >= 371, f"{len(alias_map)} aliases")
+        add("presets.json", len(presets) >= 371, f"{len(presets)} presets")
         add("voice_aliases.json", len(voice_aliases) >= 1, f"{len(voice_aliases)} voice groups")
         voice_id, used_default, matched_alias = resolve_voice_id("性感女声", alias_map, presets, voice_aliases)
-        add("voice matching", voice_id == "queen_female" and not used_default, f"性感女声 -> {voice_id} ({matched_alias})")
+        add("voice matching", voice_id == "性感女声" and not used_default, f"性感女声 -> {voice_id} ({matched_alias})")
     except Exception as exc:
         add("data files", False, str(exc))
 

@@ -10,6 +10,22 @@ $CommandSourceDir = Join-Path $SourceDir "commands"
 $CommandTargetDir = Join-Path $ClaudeHome "commands"
 $LegacyCommand = Join-Path $CommandTargetDir "tts-lychee.md"
 
+$RequiredSourcePaths = @(
+    (Join-Path $SkillSource "SKILL.md"),
+    (Join-Path $SkillSource "doctor.ps1"),
+    (Join-Path $SkillSource "doctor.sh"),
+    (Join-Path $SkillSource "scripts"),
+    (Join-Path $SkillSource "data"),
+    (Join-Path $CommandSourceDir "tts-lychee-preview-match.md"),
+    (Join-Path $CommandSourceDir "tts-lychee-list-voices.md")
+)
+
+foreach ($RequiredSourcePath in $RequiredSourcePaths) {
+    if (-not (Test-Path -LiteralPath $RequiredSourcePath)) {
+        throw "Required source path is missing: $RequiredSourcePath"
+    }
+}
+
 New-Item -ItemType Directory -Path $SkillTarget -Force | Out-Null
 New-Item -ItemType Directory -Path $CommandTargetDir -Force | Out-Null
 
@@ -27,5 +43,5 @@ if (Test-Path -LiteralPath $LegacyCommand) {
 }
 
 Write-Host "Installed skill: $SkillTarget"
-Write-Host "Restart Claude Code, then use: /tts-lychee 你好，欢迎使用短剧翻译平台。"
+Write-Host "Restart Claude Code, then use: /tts-lychee <text to synthesize>"
 Write-Host "Set TTS_API_KEY before use. Get an API Key from https://shanhaistudio.lycheeai.com.cn/"
