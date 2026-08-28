@@ -76,7 +76,7 @@ def resolve_voice(args: argparse.Namespace, api: LycheeApiClient) -> Tuple[str, 
 def run_list_voices(args: argparse.Namespace) -> Dict[str, Any]:
     api = build_api(args)
     query = args.search_voices or args.voice_query
-    voices = api.list_all_public_voices(name=query)
+    voices = api.search_public_voices(query) if query else api.list_all_public_voices()
     return {
         "success": True,
         "query": query or "",

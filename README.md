@@ -6,6 +6,7 @@ Lychee TTS Skill：实时查询公共音色，支持音色设计、语音克隆�
 
 - 公共音色来自 `GET https://voice.lycheeai.com.cn/openapi/voice-list`，不打包固定音色表。
 - 公共音色返回项的 `name` 直接作为 TTS `speaker_id`。
+- 支持先拉取完整公共音色列表，再按名称、描述和语言做关键词预筛；自然语言场景由 Agent 阅读描述后语义筛选。
 - 支持 `POST /openapi/voice-design` 设计试听音色。
 - 支持 `POST /openapi/tts/clone` 克隆本地或设计试听音频。
 - 克隆返回的 `request_id` 保存为个人音色的 TTS `speaker_id`。
@@ -96,10 +97,16 @@ export TTS_API_KEY="你的API密钥"
 python ~/.claude/skills/tts-lychee/scripts/tts_client.py --list-voices
 ```
 
-按名称或描述搜索：
+按名称、描述和语言做关键词预筛：
 
 ```bash
 python ~/.claude/skills/tts-lychee/scripts/tts_client.py --search-voices "温柔"
+```
+
+对于“适合纪录片旁白的成熟男声”这类自然语言需求，应先查询完整列表，让 Agent 阅读每个音色的描述后再推荐候选：
+
+```bash
+python ~/.claude/skills/tts-lychee/scripts/tts_client.py --list-voices
 ```
 
 流式朗读并播放：

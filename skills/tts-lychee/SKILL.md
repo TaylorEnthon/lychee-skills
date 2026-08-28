@@ -1,7 +1,7 @@
 ---
 name: tts-lychee
 description: Use when the user asks for TTS, 配音, 朗读, 生成语音, 公共音色查询, 音色设计, 语音克隆, or true streaming speech with Lychee.
-version: 2.0.0
+version: 2.1.0
 user-invocable: true
 metadata:
   openclaw:
@@ -30,14 +30,20 @@ metadata:
 
 ### 查询或选择公共音色
 
-用户问“有哪些音色”“找一个温柔的音色”时，运行实时列表或搜索：
+先区分“按名称查找”和“按描述筛选”：
+
+- 用户明确给出音色名称时，直接使用这个名称解析公共音色。
+- 用户只给出一个关键词时，可以运行 `--search-voices`；客户端会先拉取完整列表，再对 `name`、`description` 和 `lang_code` 做关键词预筛。
+- 用户提出“找一个适合纪录片旁白的成熟男声”这类自然语言需求时，必须运行 `--list-voices` 拉取完整列表。Agent 要阅读每个返回项的 `description`，结合语言、性别、音色特征和适用场景做语义筛选，再展示候选。
+
+不要把完整自然语言需求直接作为服务端 `/openapi/voice-list` 的 `name` 查询；服务端的 `name` 只支持音色名称模糊匹配。关键词预筛不是最终语义判断，Agent 仍要以返回的描述为依据：
 
 ```bash
 python3 {baseDir}/scripts/tts_client.py --list-voices
 python3 {baseDir}/scripts/tts_client.py --search-voices "用户的搜索词"
 ```
 
-只展示 `name`、描述、语言和试听地址。精确名称优先；模糊结果超过一个时展示候选并让用户选择。客户端先验证实时公共音色；只有服务端明确没有该公共名称、且用户目录中存在同名个人音色时，才使用个人音色。
+只展示 `name`、描述、语言和试听地址。精确名称优先；语义筛选后展示 2-5 个候选并说明匹配理由，让用户选择。没有候选时不要静默替换音色，应扩大为完整列表后重新判断或明确告知未找到。客户端先验证实时公共音色；只有服务端明确没有该公共名称、且用户目录中存在同名个人音色时，才使用个人音色。
 
 ### 使用公共音色朗读
 

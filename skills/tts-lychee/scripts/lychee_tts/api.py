@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import mimetypes
 import os
+import re
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -203,6 +204,62 @@ class LycheeApiClient:
                 break
             page_no += 1
         return voices
+
+    @staticmethod
+    def _search_terms(query: str) -> List[str]:
+        normalized = re.sub(
+            r"[\s,，。！？!?、；;：:（）()【】\[\]《》\"'“”‘’]+",
+            " ",
+            (query or "").casefold(),
+        ).strip()
+        if not normalized:
+            return []
+
+        terms: List[str] = []
+        for part in normalized.split():
+            if re.search(r"[\u4e00-\u9fff]", part):
+                compact = re.sub(r"[^\u4e00-\u9fffA-Za-z0-9]+", "", part)
+                if compact:
+                    terms.append(compact)
+                if len(compact) > 2:
+                    terms.extend(compact[index : index + 2] for index in range(len(compact) - 1))
+            else:
+                terms.append(part)
+
+        unique: List[str] = []
+        for term in terms:
+            if len(term) >= 2 and term not in unique:
+                unique.append(term)
+        return unique
+
+    def search_public_voices(
+        self,
+        query: str,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> List[PublicVoice]:
+        """Fetch the live catalog, then pre-filter names and descriptions locally."""
+        voices = self.list_all_public_voices(page_size=page_size)
+        terms = self._search_terms(query)
+        if not terms:
+            return voices
+
+        ranked = []
+        for voice in voices:
+            name = voice.name.casefold()
+            searchable = " ".join(
+                (voice.name, voice.description, voice.lang_code)
+            ).casefold()
+            score = 0
+            for term in terms:
+                if term in name:
+                    score += 4
+                elif term in searchable:
+                    score += 2
+            if score:
+                ranked.append((score, voice))
+
+        ranked.sort(key=lambda item: (-item[0], item[1].name.casefold()))
+        return [voice for _, voice in ranked]
 
     def resolve_public_voice(self, requested: str) -> PublicVoice:
         query = (requested or "").strip()

@@ -104,6 +104,26 @@ def test_public_voice_list_paginates_until_total():
     assert session.calls[1][2]["params"]["page_no"] == 2
 
 
+def test_search_public_voices_matches_description_after_fetching_full_list():
+    session = FakeSession([
+        FakeResponse({
+            "code": 200,
+            "data": {
+                "list": [
+                    {"name": "岳山", "description": "沉稳男声，适合纪录片旁白"},
+                    {"name": "叶玲", "description": "明亮女声，适合短视频"},
+                ],
+                "total": 2,
+            },
+        })
+    ])
+
+    voices = LycheeApiClient(api_key="test-key", session=session).search_public_voices("纪录片")
+
+    assert [voice.name for voice in voices] == ["岳山"]
+    assert "name" not in session.calls[0][2]["params"]
+
+
 def test_multiple_fuzzy_public_voice_matches_are_not_silently_replaced():
     session = FakeSession([
         FakeResponse({
