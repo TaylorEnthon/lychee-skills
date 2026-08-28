@@ -15,8 +15,8 @@ $RequiredSourcePaths = @(
     (Join-Path $SkillSource "doctor.ps1"),
     (Join-Path $SkillSource "doctor.sh"),
     (Join-Path $SkillSource "scripts"),
-    (Join-Path $SkillSource "data"),
-    (Join-Path $CommandSourceDir "tts-lychee-preview-match.md"),
+    (Join-Path $SkillSource "requirements.txt"),
+    (Join-Path $CommandSourceDir "tts-lychee-search-voices.md"),
     (Join-Path $CommandSourceDir "tts-lychee-list-voices.md")
 )
 
@@ -33,9 +33,21 @@ Copy-Item -LiteralPath (Join-Path $SkillSource "SKILL.md") -Destination (Join-Pa
 Copy-Item -LiteralPath (Join-Path $SkillSource "doctor.ps1") -Destination (Join-Path $SkillTarget "doctor.ps1") -Force
 Copy-Item -LiteralPath (Join-Path $SkillSource "doctor.sh") -Destination (Join-Path $SkillTarget "doctor.sh") -Force
 Copy-Item -LiteralPath (Join-Path $SkillSource "scripts") -Destination $SkillTarget -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $SkillSource "data") -Destination $SkillTarget -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $CommandSourceDir "tts-lychee-preview-match.md") -Destination (Join-Path $CommandTargetDir "tts-lychee-preview-match.md") -Force
+Copy-Item -LiteralPath (Join-Path $SkillSource "requirements.txt") -Destination (Join-Path $SkillTarget "requirements.txt") -Force
 Copy-Item -LiteralPath (Join-Path $CommandSourceDir "tts-lychee-list-voices.md") -Destination (Join-Path $CommandTargetDir "tts-lychee-list-voices.md") -Force
+Copy-Item -LiteralPath (Join-Path $CommandSourceDir "tts-lychee-search-voices.md") -Destination (Join-Path $CommandTargetDir "tts-lychee-search-voices.md") -Force
+
+$LegacyDataTarget = Join-Path $SkillTarget "data"
+if (Test-Path -LiteralPath $LegacyDataTarget) {
+    Remove-Item -LiteralPath $LegacyDataTarget -Recurse -Force
+    Write-Host "Removed legacy bundled voice data: $LegacyDataTarget"
+}
+
+$LegacyPreviewCommand = Join-Path $CommandTargetDir "tts-lychee-preview-match.md"
+if (Test-Path -LiteralPath $LegacyPreviewCommand) {
+    Remove-Item -LiteralPath $LegacyPreviewCommand -Force
+    Write-Host "Removed obsolete voice matching command: $LegacyPreviewCommand"
+}
 
 if (Test-Path -LiteralPath $LegacyCommand) {
     Remove-Item -LiteralPath $LegacyCommand -Force
@@ -43,5 +55,6 @@ if (Test-Path -LiteralPath $LegacyCommand) {
 }
 
 Write-Host "Installed skill: $SkillTarget"
+Write-Host "Install dependencies with: python -m pip install -r `"$(Join-Path $SkillTarget 'requirements.txt')`""
 Write-Host "Restart Claude Code, then use: /tts-lychee <text to synthesize>"
-Write-Host "Set TTS_API_KEY before use. Get an API Key from https://shanhaistudio.lycheeai.com.cn/"
+Write-Host "Set TTS_API_KEY before use. Get an API Key from https://voice.lycheeai.com.cn/"

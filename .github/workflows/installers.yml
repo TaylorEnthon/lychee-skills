@@ -5,6 +5,18 @@ on:
   pull_request:
 
 jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install pytest requests websocket-client
+      - name: Run unit tests
+        run: python -m pytest -q
+
   windows:
     runs-on: windows-latest
     steps:
@@ -21,8 +33,11 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands\tts-lychee-list-voices.md"))) {
             throw "List voices command was not installed by Windows PowerShell."
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands\tts-lychee-preview-match.md"))) {
-            throw "Preview match command was not installed by Windows PowerShell."
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands\tts-lychee-search-voices.md"))) {
+            throw "Search voices command was not installed by Windows PowerShell."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills\tts-lychee\requirements.txt"))) {
+            throw "Requirements file was not installed by Windows PowerShell."
           }
 
       - name: Install with PowerShell 7
@@ -33,11 +48,11 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills/tts-lychee/SKILL.md"))) {
             throw "Skill was not installed by PowerShell 7."
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands/tts-lychee-list-voices.md"))) {
-            throw "List voices command was not installed by PowerShell 7."
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills/tts-lychee/requirements.txt"))) {
+            throw "Requirements file was not installed by PowerShell 7."
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands/tts-lychee-preview-match.md"))) {
-            throw "Preview match command was not installed by PowerShell 7."
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "commands/tts-lychee-search-voices.md"))) {
+            throw "Search voices command was not installed by PowerShell 7."
           }
 
   bash:
@@ -51,5 +66,6 @@ jobs:
           export CLAUDE_HOME="$RUNNER_TEMP/claude-bash"
           bash ./install.sh
           test -f "$CLAUDE_HOME/skills/tts-lychee/SKILL.md"
+          test -f "$CLAUDE_HOME/skills/tts-lychee/requirements.txt"
           test -f "$CLAUDE_HOME/commands/tts-lychee-list-voices.md"
-          test -f "$CLAUDE_HOME/commands/tts-lychee-preview-match.md"
+          test -f "$CLAUDE_HOME/commands/tts-lychee-search-voices.md"
