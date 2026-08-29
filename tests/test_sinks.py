@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import wave
 from pathlib import Path
+import sys
+from types import SimpleNamespace
 
 import pytest
 
-from lychee_tts.sinks import PcmStream, WaveFileSink
+from lychee_tts.sinks import PcmStream, PlaybackSink, WaveFileSink
 
 
 def test_wave_sink_writes_pcm_incrementally_and_commits_only_on_success(tmp_path: Path):
@@ -61,3 +63,28 @@ def test_pcm_stream_rejects_an_incomplete_final_sample():
     stream.write(b"\x01")
     with pytest.raises(ValueError, match="不完整"):
         stream.finish()
+
+
+def test_sounddevice_load_error_is_reported_as_unavailable(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fail_sounddevice(name, *args, **kwargs):
+        if name == "sounddevice":
+            raise OSError("PortAudio library not found")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fail_sounddevice)
+
+    assert PlaybackSink.dependency_available() is False
+
+
+def test_sounddevice_without_an_output_device_is_unavailable(monkeypatch):
+    monkeypatch.setitem(
+        sys.modules,
+        "sounddevice",
+        SimpleNamespace(query_devices=lambda: [{"max_output_channels": 0}]),
+    )
+
+    assert PlaybackSink.dependency_available() is False

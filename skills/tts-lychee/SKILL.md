@@ -1,130 +1,119 @@
 ---
 name: tts-lychee
-description: Use when the user asks for TTS, 配音, 朗读, 生成语音, 公共音色查询, 音色设计, 语音克隆, or true streaming speech with Lychee.
-version: 2.1.0
-user-invocable: true
+description: Use when a user asks to synthesize, stream, play, or save speech; discover public voices; design a voice; or clone and reuse a personal voice with Lychee.
 metadata:
   openclaw:
     requires:
-      bins: ["python3"]
       env: ["TTS_API_KEY"]
     primaryEnv: "TTS_API_KEY"
 ---
 
 # TTS Lychee
 
-这是 Lychee 的实时语音 Skill。公共音色以服务端实时列表为准；设计或克隆得到的音色也统一进入同一条 PCM 流式合成链路。
+Lychee 实时语音 Skill。核心流程与具体 Agent 无关：使用随 Skill 分发的启动脚本选择可用 Python，再调用同一套客户端。
 
-## 硬性约束
+## 启动客户端
 
-- 服务地址是 `https://voice.lycheeai.com.cn`。
-- 公共音色必须从 `/openapi/voice-list` 查询，返回项的 `name` 才是可用的公共音色标识。
-- 不使用本地固定音色、别名表或默认男女声；找不到指定音色时不能静默替换。
-- 实时 TTS WebSocket 是 `wss://voice.lycheeai.com.cn/openapi/tts/ws_binary/v2`。
-- 流式配置固定为 `codec=pcm`、`sample_rate=16000`、`speed=1.0`。不能改为 MP3、24000 Hz 或其他语速。
-- 每个音频块到达后立即播放或写入，不能等整段完成后再输出。
-- 流式结果保存为单声道 PCM16 WAV；MP3 不是实时路径。
-- `TTS_API_KEY` 只从环境变量读取，不写入命令行、日志或回复。
+`{baseDir}` 表示本 `SKILL.md` 所在目录；运行时不自动展开时，替换成实际绝对路径。根据当前 Shell 选择一个启动前缀，后续示例中的 `<launcher>` 均指它：
 
-## 用户请求分流
-
-### 查询或选择公共音色
-
-先区分“按名称查找”和“按描述筛选”：
-
-- 用户明确给出音色名称时，直接使用这个名称解析公共音色。
-- 用户只给出一个关键词时，可以运行 `--search-voices`；客户端会先拉取完整列表，再对 `name`、`description` 和 `lang_code` 做关键词预筛。
-- 用户提出“找一个适合纪录片旁白的成熟男声”这类自然语言需求时，必须运行 `--list-voices` 拉取完整列表。Agent 要阅读每个返回项的 `description`，结合语言、性别、音色特征和适用场景做语义筛选，再展示候选。
-
-不要把完整自然语言需求直接作为服务端 `/openapi/voice-list` 的 `name` 查询；服务端的 `name` 只支持音色名称模糊匹配。关键词预筛不是最终语义判断，Agent 仍要以返回的描述为依据：
-
-```bash
-python3 {baseDir}/scripts/tts_client.py --list-voices
-python3 {baseDir}/scripts/tts_client.py --search-voices "用户的搜索词"
+```text
+Windows PowerShell: powershell -NoProfile -ExecutionPolicy Bypass -File "{baseDir}/scripts/run.ps1"
+Bash:               bash "{baseDir}/scripts/run.sh"
 ```
 
-只展示 `name`、描述、语言和试听地址。精确名称优先；语义筛选后展示 2-5 个候选并说明匹配理由，让用户选择。没有候选时不要静默替换音色，应扩大为完整列表后重新判断或明确告知未找到。客户端先验证实时公共音色；只有服务端明确没有该公共名称、且用户目录中存在同名个人音色时，才使用个人音色。
+不要固定调用 `python` 或 `python3`。启动脚本会验证 Python 3.8+，并避开 WindowsApps 等不可执行占位符。
 
-### 使用公共音色朗读
+首次使用先运行：
 
-用户明确给出公共音色名称时，原样传给 `--voice`：
-
-```bash
-python3 {baseDir}/scripts/tts_client.py \
-  --text "要朗读的文本" \
-  --voice "用户指定的公共音色名称" \
-  --play
+```text
+<launcher> --doctor
 ```
 
-默认生成当前目录下的 WAV。用户指定路径时使用 `--output`；除非用户明确允许覆盖，否则不要使用 `--overwrite`。
+缺少核心依赖时运行 `<launcher> --install-deps`。用户需要边合成边通过本机声卡播放时，再运行 `<launcher> --install-playback`；无声卡或不安装播放依赖时仍可增量生成 WAV。
 
-用户没有指定音色时，不要猜测。询问音色，或先列出少量实时候选；只有用户明确说“随便一个/使用默认”时，才采用当前服务端列表的第一个返回项。
+## 不可变约束
 
-### 设计并克隆个人音色
+- 服务地址：`https://voice.lycheeai.com.cn`。
+- 公共音色来自 `/openapi/voice-list`；返回项的 `name` 是公共 `speaker_id`。
+- 不使用本地固定音色表、预设男女声或静默回退。
+- 实时 TTS：`wss://voice.lycheeai.com.cn/openapi/tts/ws_binary/v2`。
+- 真流式固定为 `codec=pcm`、`sample_rate=16000`、`speed=1.0`。
+- PCM 块到达后立即写入 WAV，并在请求播放时立即送入声卡；不能缓冲完整响应后再输出。
+- 输出为单声道 PCM16 WAV；MP3 不属于实时路径。
+- `TTS_API_KEY` 只从环境变量读取，不放入命令行、日志、文件或回复。
 
-这是有副作用的操作，必须在克隆前向用户展示设计试听并获得确认；客户端还要求显式 `--confirm-clone`。
+## 公共音色发现
 
-1. 设计：
+按用户意图选择：
 
-```bash
-python3 {baseDir}/scripts/tts_client.py \
-  --design-description "自然语言音色描述" \
-  --design-text "用于试听的文本"
+- 明确音色名：直接用于朗读，客户端会检查实时公共名称。
+- 单个关键词：运行 `<launcher> --search-voices "关键词"`，对实时列表的名称、描述和语言做预筛。
+- “适合纪录片旁白的成熟男声”这类自然语言需求：运行 `<launcher> --list-voices`，阅读完整返回项的 `description`，结合语言、性别、质感和场景语义筛选。
+
+自然语言筛选后展示 2–5 个候选，包含名称、描述、语言、试听地址和匹配理由，让用户选择。服务端 `name` 查询只用于名称，不承担语义搜索。没有候选时扩大到完整列表重新判断；仍没有则明确告知，不能替换为固定默认音色。
+
+## 真流式朗读
+
+用户确认音色后运行：
+
+```text
+<launcher> --text "要朗读的文本" --voice "音色名称" --play --progress --output "speech.wav"
 ```
 
-2. 将返回的 `preview_audio_url` 作为试听结果，等待用户确认。
-3. 确认后克隆并保存个人别名：
+- 用户不需要本机播放时省略 `--play`，仍会边接收边写 WAV。
+- 除非用户明确允许覆盖，否则不要添加 `--overwrite`。
+- 用户没有指定音色时，询问或展示实时候选；只有用户明确允许任意音色时才采用实时列表第一项。
+- 播放设备打开或写入失败时，WAV 继续生成；最终明确提示未播放。
+- 长文本会按自然标点分段，每段保持 PCM 16000/speed 1.0；持续收到音频不会被总时长误判为超时。
 
-```bash
-python3 {baseDir}/scripts/tts_client.py \
-  --clone-url "已确认的试听音频地址" \
-  --clone-name "用户给出的个人音色名" \
-  --confirm-clone
+`--progress` 将结构化事件写到 stderr。收到 `first_audio` 后可以立即告诉用户“已经开始播放/生成”，无需等整个文本完成。
+
+## 设计并克隆个人音色
+
+音色设计返回试听，不自动克隆：
+
+```text
+<launcher> --design-description "自然语言音色描述" --design-text "试听文本"
 ```
 
-也可以用 `--clone-audio` 克隆用户提供的本地参考音频。克隆响应中的 `request_id` 是后续 TTS 使用的 `speaker_id`，客户端会将它保存到用户目录的个人音色注册表；音色设计响应中的 `request_id` 不是 TTS 的 `speaker_id`。
+向用户展示 `preview_audio_url`。只有用户确认试听后才执行：
 
-后续用户说“用我的音色朗读”时，使用保存的个人音色名作为 `--voice`，不要重新克隆。
-
-## 安装与自检
-
-安装后先安装依赖：
-
-```bash
-python3 -m pip install -r {baseDir}/requirements.txt
+```text
+<launcher> --clone-url "已确认的试听地址" --clone-name "个人音色别名" --confirm-clone
 ```
 
-检查安装：
+也可以用 `--clone-audio` 克隆用户提供的本地音频。克隆响应中的 `request_id` 才是后续 TTS 的 `speaker_id`；音色设计响应中的 `request_id` 不是。
 
-```bash
-python3 {baseDir}/scripts/tts_client.py --doctor
+同名个人别名不会静默覆盖。用户明确确认替换后添加 `--replace-personal-voice`。远程试听地址不能指向本机或私有网络。
+
+## 个人音色管理
+
+查询已保存的个人音色：
+
+```text
+<launcher> --list-personal-voices
 ```
 
-Windows 也可以运行已安装目录中的 `doctor.ps1`；macOS/Linux 可以运行 `doctor.sh`。自检不会发起 TTS 合成，但会检查核心依赖、API Key 和旧版数据是否残留。
+后续直接把个人别名传给 `--voice`，不要重复克隆。删除只影响本地别名，执行前必须获得用户确认：
 
-## 输出契约
-
-客户端标准输出最终返回一个 JSON 对象，包含：
-
-```json
-{
-  "success": true,
-  "output": "绝对 WAV 路径",
-  "voice": "用户可理解的音色名",
-  "format": "wav",
-  "sample_rate": 16000,
-  "first_audio_ms": 240,
-  "bytes_written": 123456
-}
+```text
+<launcher> --rename-personal-voice "旧别名" --new-personal-voice-name "新别名" --confirm-rename
+<launcher> --remove-personal-voice "别名" --confirm-remove
 ```
 
-普通回复只告诉用户是否成功、采用的音色名和 WAV 路径。不要展示 API Key、内部 `speaker_id`、协议事件或源码路径。生成失败时说明真实失败原因，不要声称已生成。
+不要把本地别名删除描述成服务端音色删除。
 
-## 常见错误处理
+## 输出与回复
 
-- API Key 缺失：停止调用并提示配置 `TTS_API_KEY`。
-- 公共音色不存在：重新查询并让用户选择，不回退。
-- 公共音色匹配多个：展示候选，不自动猜测。
-- 设备没有音频输出或缺少 `sounddevice`：保留 WAV 增量生成，并明确提示未播放。
-- WebSocket 中途失败：删除未完成的 partial 文件，不把它当作成功音频。
-- 文本过长：客户端按标点分段，仍使用同样的 PCM 16000 流式配置。
+标准输出最终是一个 JSON 对象。朗读成功结果包含 WAV 绝对路径、音色名、`first_audio_ms`、`end_to_end_first_audio_ms`、字节数、分段数、是否成功播放及安全 warning。
+
+普通回复只说明：是否成功、采用的音色、是否已经播放、WAV 路径，以及必要 warning。不要展示 API Key、内部个人 `speaker_id`、协议帧或源码路径。失败时说明真实阶段和原因，不能声称已生成。
+
+## 错误处理
+
+- API Key 缺失：停止调用，提示配置 `TTS_API_KEY`。
+- 公共音色不存在或匹配多个：展示实时候选，不自动猜测。
+- 核心依赖缺失：使用启动脚本安装后重新 doctor。
+- 播放依赖或设备不可用：保留 WAV，明确提示未播放。
+- WebSocket 或协议失败：不提交损坏的 partial WAV。
+- 操作参数冲突：拆成一次一个操作；不能依赖隐藏优先级。

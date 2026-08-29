@@ -37,7 +37,8 @@ STREAM_CODEC = "pcm"
 STREAM_SAMPLE_RATE = 16000
 STREAM_SPEED = 1.0
 MAX_TEXT_LENGTH = 10000
-SEGMENT_TEXT_LENGTH = 9000
+# Smaller segments bound recovery cost while keeping connection overhead low for long-form speech.
+SEGMENT_TEXT_LENGTH = 1000
 
 
 class TtsStreamError(RuntimeError):
@@ -54,10 +55,10 @@ class StreamResult:
 
 def split_text(text: str, max_length: int = SEGMENT_TEXT_LENGTH) -> List[str]:
     text = (text or "").strip()
-    if len(text) <= MAX_TEXT_LENGTH:
-        return [text]
     if max_length < 1 or max_length > MAX_TEXT_LENGTH:
         raise ValueError("max_length 无效")
+    if len(text) <= max_length:
+        return [text]
     result: List[str] = []
     remaining = text
     punctuation = "。！？!?；;\n"
@@ -116,7 +117,7 @@ class StreamingTtsClient:
     ) -> StreamResult:
         if websocket is None:
             raise TtsStreamError(
-                "缺少 websocket-client 依赖，请执行 python -m pip install -r requirements.txt"
+                "缺少 websocket-client 依赖，请使用 Skill 启动脚本执行 --install-deps"
             )
         if not self.api_key:
             raise TtsStreamError("TTS_API_KEY 未配置")
@@ -181,6 +182,7 @@ class StreamingTtsClient:
         got_audio = False
         first_audio_ms: Optional[int] = None
         try:
+            emit("connecting", segment=segment_index)
             try:
                 connection = websocket.create_connection(
                     self.ws_url,
@@ -190,15 +192,16 @@ class StreamingTtsClient:
             except Exception as exc:
                 raise TtsStreamError("TTS WebSocket 连接失败") from exc
 
-            emit("connecting", segment=segment_index)
             send_packet(connection, EVENT_START_CONNECTION, {})
-            deadline = time.monotonic() + self.timeout
             while True:
-                if time.monotonic() > deadline:
-                    raise TtsStreamError("TTS 流式合成超时")
                 try:
                     raw = connection.recv()
                 except Exception as exc:
+                    timeout_error = getattr(websocket, "WebSocketTimeoutException", ())
+                    if timeout_error and isinstance(exc, timeout_error):
+                        raise TtsStreamError(
+                            f"TTS 流式连接超过 {self.timeout} 秒未收到数据"
+                        ) from exc
                     raise TtsStreamError("TTS WebSocket 接收失败") from exc
                 if raw is None or raw == b"":
                     raise TtsStreamError("TTS WebSocket 提前关闭")

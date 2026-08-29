@@ -1,6 +1,6 @@
 ---
 description: 查询 tts-lychee 当前可用的公共音色列表
-allowed-tools: Bash(python:*), Bash(python3:*)
+allowed-tools: Bash(bash:*)
 ---
 
 使用已安装 Skill 的客户端实时调用公共音色接口展示当前可用音色。自然语言选音色时，Agent 必须阅读返回项的 `description`，结合用户的场景和音色要求筛选候选。不要合成音频，不要读取源码或本地配置，不要展示 API Key 或内部标识。
@@ -10,7 +10,7 @@ allowed-tools: Bash(python:*), Bash(python3:*)
 调用：
 
 ```bash
-python3 {baseDir}/scripts/tts_client.py --list-voices
+bash "${CLAUDE_HOME:-$HOME/.claude}/skills/tts-lychee/scripts/run.sh" --list-voices
 ```
 
 按名称、语言和简短描述用简洁列表回复用户。

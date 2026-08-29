@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import lychee_tts.api as api_module
 from lychee_tts.api import LycheeApiClient, LycheeApiError, VoiceSelectionError
 
 
@@ -164,3 +165,64 @@ def test_voice_design_returns_preview_url_without_confusing_request_ids():
     assert result.audio_url == "https://example.test/preview.wav"
     assert result.request_id == "design-request-123"
     assert session.calls[0][2]["json"]["optimize_text"] is False
+
+
+def test_natural_language_prefilter_drops_generic_weak_matches():
+    session = FakeSession([
+        FakeResponse({
+            "code": 200,
+            "data": {
+                "list": [
+                    {"name": "岳山", "description": "沉稳成熟男声，适合纪录片旁白"},
+                    {"name": "叶玲", "description": "明亮女声，适合短视频"},
+                ],
+                "total": 2,
+            },
+        })
+    ])
+
+    voices = LycheeApiClient(api_key="test-key", session=session).search_public_voices(
+        "适合纪录片旁白的成熟男声"
+    )
+
+    assert [voice.name for voice in voices] == ["岳山"]
+
+
+def test_voice_prefilter_explains_which_fields_and_terms_matched():
+    session = FakeSession([
+        FakeResponse({
+            "code": 200,
+            "data": {
+                "list": [
+                    {"name": "岳山", "description": "沉稳男声，适合纪录片旁白", "lang_code": "zh"},
+                ],
+                "total": 1,
+            },
+        })
+    ])
+
+    matches = LycheeApiClient(api_key="test-key", session=session).search_public_voice_matches(
+        "纪录片"
+    )
+
+    assert matches[0].voice.name == "岳山"
+    assert matches[0].matched_fields == ("description",)
+    assert "纪录片" in matches[0].matched_terms
+
+
+def test_clone_download_rejects_private_literal_before_network(tmp_path: Path, monkeypatch):
+    class RequestsSentinel:
+        class RequestException(Exception):
+            pass
+
+        @staticmethod
+        def get(*args, **kwargs):
+            raise AssertionError("private URL must be rejected before network access")
+
+    monkeypatch.setattr(api_module, "requests", RequestsSentinel)
+
+    with pytest.raises(ValueError, match="私有|本机"):
+        LycheeApiClient(api_key="test-key").download_audio(
+            "http://127.0.0.1/sample.wav",
+            tmp_path / "sample.wav",
+        )

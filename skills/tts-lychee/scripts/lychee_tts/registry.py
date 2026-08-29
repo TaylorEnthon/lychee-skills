@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import tempfile
 from typing import Dict, List, Optional
 
 
@@ -55,35 +57,118 @@ class VoiceRegistry:
             return None
         return self._read().get(alias.strip())
 
-    def save(self, voice: StoredVoice) -> StoredVoice:
+    @contextmanager
+    def _write_lock(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_name(self.path.name + ".lock")
+        handle = lock_path.open("a+b")
+        locked = False
+        try:
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"0")
+                handle.flush()
+            handle.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            locked = True
+            yield
+        finally:
+            try:
+                if locked:
+                    handle.seek(0)
+                    if os.name == "nt":
+                        import msvcrt
+
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
+
+    def _write(self, voices: Dict[str, StoredVoice]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"version": 1, "voices": [asdict(item) for item in voices.values()]}
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=self.path.name + ".",
+            suffix=".tmp",
+            dir=str(self.path.parent),
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as output:
+                output.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+            os.replace(str(temporary), str(self.path))
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+
+    def save(self, voice: StoredVoice, replace: bool = False) -> StoredVoice:
         alias = voice.alias.strip()
         speaker_id = voice.speaker_id.strip()
         if not alias or not speaker_id:
             raise ValueError("个人音色需要 alias 和 speaker_id")
-        current = self._read()
-        stored = StoredVoice(
-            alias=alias,
-            speaker_id=speaker_id,
-            description=voice.description,
-            preview_audio_url=voice.preview_audio_url,
-            created_at=voice.created_at or datetime.now(timezone.utc).isoformat(),
-        )
-        current[alias] = stored
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(self.path.name + ".tmp")
-        payload = {"version": 1, "voices": [asdict(item) for item in current.values()]}
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        os.replace(str(temporary), str(self.path))
-        return stored
+        with self._write_lock():
+            current = self._read()
+            existing = current.get(alias)
+            if existing and existing.speaker_id != speaker_id and not replace:
+                raise FileExistsError(f"个人音色别名已存在：{alias}")
+            stored = StoredVoice(
+                alias=alias,
+                speaker_id=speaker_id,
+                description=voice.description,
+                preview_audio_url=voice.preview_audio_url,
+                created_at=(
+                    voice.created_at
+                    or (existing.created_at if existing else "")
+                    or datetime.now(timezone.utc).isoformat()
+                ),
+            )
+            current[alias] = stored
+            self._write(current)
+            return stored
 
     def remove(self, alias: str) -> bool:
-        current = self._read()
-        if alias not in current:
-            return False
-        del current[alias]
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_name(self.path.name + ".tmp")
-        payload = {"version": 1, "voices": [asdict(item) for item in current.values()]}
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        os.replace(str(temporary), str(self.path))
-        return True
+        alias = (alias or "").strip()
+        if not alias:
+            raise ValueError("个人音色别名不能为空")
+        with self._write_lock():
+            current = self._read()
+            if alias not in current:
+                return False
+            del current[alias]
+            self._write(current)
+            return True
+
+    def rename(self, alias: str, new_alias: str) -> StoredVoice:
+        alias = (alias or "").strip()
+        new_alias = (new_alias or "").strip()
+        if not alias or not new_alias:
+            raise ValueError("旧别名和新别名都不能为空")
+        with self._write_lock():
+            current = self._read()
+            source = current.get(alias)
+            if source is None:
+                raise ValueError(f"未找到个人音色：{alias}")
+            if new_alias != alias and new_alias in current:
+                raise FileExistsError(f"个人音色别名已存在：{new_alias}")
+            renamed = StoredVoice(
+                alias=new_alias,
+                speaker_id=source.speaker_id,
+                description=source.description,
+                preview_audio_url=source.preview_audio_url,
+                created_at=source.created_at,
+            )
+            if new_alias != alias:
+                del current[alias]
+            current[new_alias] = renamed
+            self._write(current)
+            return renamed

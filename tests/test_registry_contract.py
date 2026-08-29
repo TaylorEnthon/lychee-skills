@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from lychee_tts.api import PublicVoice, VoiceSelectionError
 from lychee_tts.registry import StoredVoice, VoiceRegistry
 from tts_client import build_parser, resolve_voice
@@ -23,7 +25,6 @@ def test_optional_clone_flags_are_omitted_when_not_requested():
 
 
 def test_clone_requires_explicit_confirmation(tmp_path: Path):
-    import pytest
     from tts_client import run_clone
 
     audio = tmp_path / "sample.wav"
@@ -91,3 +92,19 @@ def test_personal_alias_is_used_when_public_voice_is_not_found(tmp_path: Path):
             raise VoiceSelectionError("未找到公共音色")
 
     assert resolve_voice(args, Api()) == ("我的声音", "private-id", "custom")
+
+
+def test_duplicate_personal_alias_requires_explicit_replacement(tmp_path: Path):
+    registry = VoiceRegistry(tmp_path / "voices.json")
+    registry.save(StoredVoice(alias="我的声音", speaker_id="first-id"))
+
+    with pytest.raises(FileExistsError, match="我的声音"):
+        registry.save(StoredVoice(alias="我的声音", speaker_id="second-id"))
+
+    replaced = registry.save(
+        StoredVoice(alias="我的声音", speaker_id="second-id"),
+        replace=True,
+    )
+
+    assert replaced.speaker_id == "second-id"
+    assert registry.get("我的声音").speaker_id == "second-id"

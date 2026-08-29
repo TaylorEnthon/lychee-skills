@@ -21,6 +21,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python -m pip install pytest requests websocket-client
+
+      - name: Run unit tests
+        run: python -m pytest -q
 
       - name: Install with Windows PowerShell 5.1
         shell: powershell
@@ -39,6 +48,9 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills\tts-lychee\requirements.txt"))) {
             throw "Requirements file was not installed by Windows PowerShell."
           }
+          if (-not (Test-Path -LiteralPath (Join-Path $claudeHome "skills\tts-lychee\requirements-playback.txt"))) {
+            throw "Playback requirements file was not installed by Windows PowerShell."
+          }
 
       - name: Install with PowerShell 7
         shell: pwsh
@@ -55,6 +67,15 @@ jobs:
             throw "Search voices command was not installed by PowerShell 7."
           }
 
+      - name: Install Codex target with PowerShell 7
+        shell: pwsh
+        run: |
+          $codexHome = Join-Path $env:RUNNER_TEMP "codex-pwsh"
+          ./install.ps1 -Target codex -CodexHome $codexHome
+          if (-not (Test-Path -LiteralPath (Join-Path $codexHome "skills/tts-lychee/scripts/run.ps1"))) {
+            throw "Codex runtime launcher was not installed."
+          }
+
   bash:
     runs-on: ubuntu-latest
     steps:
@@ -67,5 +88,13 @@ jobs:
           bash ./install.sh
           test -f "$CLAUDE_HOME/skills/tts-lychee/SKILL.md"
           test -f "$CLAUDE_HOME/skills/tts-lychee/requirements.txt"
+          test -f "$CLAUDE_HOME/skills/tts-lychee/requirements-playback.txt"
           test -f "$CLAUDE_HOME/commands/tts-lychee-list-voices.md"
           test -f "$CLAUDE_HOME/commands/tts-lychee-search-voices.md"
+
+      - name: Install generic Agent Skills target
+        shell: bash
+        run: |
+          export AGENTS_HOME="$RUNNER_TEMP/agents-bash"
+          bash ./install.sh --target agents
+          test -f "$AGENTS_HOME/skills/tts-lychee/scripts/run.sh"

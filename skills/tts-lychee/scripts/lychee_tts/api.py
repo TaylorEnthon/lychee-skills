@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import ipaddress
 import mimetypes
 import os
 import re
@@ -50,6 +51,23 @@ class PublicVoice:
 
 
 @dataclass(frozen=True)
+class PublicVoiceMatch:
+    voice: PublicVoice
+    score: int
+    matched_fields: Tuple[str, ...]
+    matched_terms: Tuple[str, ...]
+
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = self.voice.to_dict()
+        result["match"] = {
+            "score": self.score,
+            "fields": list(self.matched_fields),
+            "terms": list(self.matched_terms),
+        }
+        return result
+
+
+@dataclass(frozen=True)
 class VoicePage:
     voices: List[PublicVoice]
     total: int
@@ -89,7 +107,7 @@ class LycheeApiClient:
             return self.session
         if requests is None:
             raise LycheeApiError(
-                "缺少 requests 依赖，请执行 python -m pip install -r requirements.txt"
+                "缺少 requests 依赖，请使用 Skill 启动脚本执行 --install-deps"
             )
         self.session = requests.Session()
         return self.session
@@ -232,34 +250,63 @@ class LycheeApiClient:
                 unique.append(term)
         return unique
 
+    def search_public_voice_matches(
+        self,
+        query: str,
+        page_size: int = DEFAULT_PAGE_SIZE,
+    ) -> List[PublicVoiceMatch]:
+        """Fetch the live catalog, then return explainable local pre-filter matches."""
+        voices = self.list_all_public_voices(page_size=page_size)
+        terms = self._search_terms(query)
+        if not terms:
+            return [PublicVoiceMatch(voice, 0, (), ()) for voice in voices]
+
+        ranked: List[PublicVoiceMatch] = []
+        for voice in voices:
+            name = voice.name.casefold()
+            description = voice.description.casefold()
+            language = voice.lang_code.casefold()
+            score = 0
+            matched_fields = set()
+            matched_terms = []
+            for term in terms:
+                term_score = 0
+                if term in name:
+                    term_score = 4
+                    matched_fields.add("name")
+                if term in description:
+                    term_score = max(term_score, 2)
+                    matched_fields.add("description")
+                if term in language:
+                    term_score = max(term_score, 2)
+                    matched_fields.add("lang_code")
+                if term_score:
+                    score += term_score
+                    matched_terms.append(term)
+            if score:
+                ranked.append(PublicVoiceMatch(
+                    voice=voice,
+                    score=score,
+                    matched_fields=tuple(sorted(matched_fields)),
+                    matched_terms=tuple(matched_terms),
+                ))
+
+        ranked.sort(key=lambda item: (-item.score, item.voice.name.casefold()))
+        if not ranked:
+            return []
+        strongest = ranked[0].score
+        threshold = 2 if len(terms) <= 2 else max(4, (strongest + 1) // 2)
+        return [match for match in ranked if match.score >= threshold]
+
     def search_public_voices(
         self,
         query: str,
         page_size: int = DEFAULT_PAGE_SIZE,
     ) -> List[PublicVoice]:
-        """Fetch the live catalog, then pre-filter names and descriptions locally."""
-        voices = self.list_all_public_voices(page_size=page_size)
-        terms = self._search_terms(query)
-        if not terms:
-            return voices
-
-        ranked = []
-        for voice in voices:
-            name = voice.name.casefold()
-            searchable = " ".join(
-                (voice.name, voice.description, voice.lang_code)
-            ).casefold()
-            score = 0
-            for term in terms:
-                if term in name:
-                    score += 4
-                elif term in searchable:
-                    score += 2
-            if score:
-                ranked.append((score, voice))
-
-        ranked.sort(key=lambda item: (-item[0], item[1].name.casefold()))
-        return [voice for _, voice in ranked]
+        return [
+            match.voice
+            for match in self.search_public_voice_matches(query, page_size=page_size)
+        ]
 
     def resolve_public_voice(self, requested: str) -> PublicVoice:
         query = (requested or "").strip()
@@ -357,6 +404,15 @@ class LycheeApiClient:
         parsed = urlparse(url or "")
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("试听音频地址不是有效的 HTTP/HTTPS URL")
+        hostname = (parsed.hostname or "").casefold()
+        if hostname == "localhost" or hostname.endswith(".localhost") or hostname.endswith(".local"):
+            raise ValueError("试听音频地址不能指向本机或私有网络")
+        try:
+            address = ipaddress.ip_address(hostname)
+        except ValueError:
+            address = None
+        if address is not None and not address.is_global:
+            raise ValueError("试听音频地址不能指向本机或私有网络")
         if requests is None:
             raise LycheeApiError("缺少 requests 依赖")
         destination = Path(destination)
@@ -364,6 +420,22 @@ class LycheeApiClient:
         try:
             response = requests.get(url, stream=True, timeout=self.timeout, headers={"Accept": "audio/*"})
             response.raise_for_status()
+            final_url = getattr(response, "url", url)
+            final_parsed = urlparse(final_url)
+            final_hostname = (final_parsed.hostname or "").casefold()
+            try:
+                final_address = ipaddress.ip_address(final_hostname)
+            except ValueError:
+                final_address = None
+            if (
+                final_parsed.scheme not in {"http", "https"}
+                or not final_parsed.netloc
+                or final_hostname == "localhost"
+                or final_hostname.endswith(".localhost")
+                or final_hostname.endswith(".local")
+                or (final_address is not None and not final_address.is_global)
+            ):
+                raise LycheeApiError("试听音频重定向到了本机或私有网络")
             total = 0
             with destination.open("wb") as output:
                 for chunk in response.iter_content(chunk_size=64 * 1024):
@@ -374,6 +446,8 @@ class LycheeApiClient:
                         raise LycheeApiError("音频文件超过 50 MB 限制")
                     output.write(chunk)
         except Exception as exc:
+            if destination.exists():
+                destination.unlink()
             if isinstance(exc, LycheeApiError):
                 raise
             if requests is not None and isinstance(exc, requests.RequestException):

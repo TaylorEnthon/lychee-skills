@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import wave
-from typing import Any, Iterable, List, Optional, Protocol
+from typing import Any, Iterable, List, Optional, Protocol, Tuple
 
 
 class AudioSink(Protocol):
@@ -66,12 +66,27 @@ class PlaybackSink:
         self._stream: Any = None
 
     @staticmethod
-    def dependency_available() -> bool:
+    def availability() -> Tuple[bool, str]:
         try:
-            import sounddevice  # noqa: F401
-        except ImportError:
-            return False
-        return True
+            import sounddevice as sd
+        except Exception as exc:
+            return False, f"sounddevice/PortAudio 不可用：{exc}"
+        try:
+            devices = sd.query_devices()
+            has_output = any(
+                int(device.get("max_output_channels", 0)) > 0
+                for device in devices
+                if hasattr(device, "get")
+            )
+        except Exception as exc:
+            return False, f"无法查询音频输出设备：{exc}"
+        if not has_output:
+            return False, "没有可用的音频输出设备"
+        return True, "sounddevice 与音频输出设备可用"
+
+    @staticmethod
+    def dependency_available() -> bool:
+        return PlaybackSink.availability()[0]
 
     def open(self) -> None:
         try:
@@ -135,6 +150,51 @@ class TeeSink:
         self._opened = []
         if errors:
             raise errors[0]
+
+
+class BestEffortSink:
+    """Keep an optional output adapter from failing the authoritative stream."""
+
+    def __init__(self, sink: AudioSink):
+        self.sink = sink
+        self.error: Optional[Exception] = None
+        self._opened = False
+        self._completed = False
+
+    @property
+    def succeeded(self) -> bool:
+        return self._completed and self.error is None
+
+    def open(self) -> None:
+        try:
+            self.sink.open()
+            self._opened = True
+        except Exception as exc:
+            self.error = exc
+
+    def write(self, chunk: bytes) -> None:
+        if not self._opened or self.error is not None:
+            return
+        try:
+            self.sink.write(chunk)
+        except Exception as exc:
+            self.error = exc
+            try:
+                self.sink.close(False)
+            except Exception:
+                pass
+            self._opened = False
+
+    def close(self, success: bool) -> None:
+        if not self._opened:
+            return
+        try:
+            self.sink.close(success)
+            self._completed = bool(success)
+        except Exception as exc:
+            self.error = exc
+        finally:
+            self._opened = False
 
 
 class PcmStream:

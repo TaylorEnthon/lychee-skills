@@ -1,6 +1,6 @@
 ---
 description: 对 tts-lychee 当前公共音色的名称、描述和语言做关键词预筛
-allowed-tools: Bash(python:*), Bash(python3:*)
+allowed-tools: Bash(bash:*)
 ---
 
 使用已安装 Skill 的客户端实时获取公共音色，并对名称、描述和语言做关键词预筛。客户端会先拉取完整列表，不要把关键词当作服务端 `name` 查询；不要合成音频，不要使用本地固定音色，不要展示 API Key 或内部标识。
@@ -10,7 +10,7 @@ allowed-tools: Bash(python:*), Bash(python3:*)
 调用：
 
 ```bash
-python3 {baseDir}/scripts/tts_client.py --search-voices "$ARGUMENTS"
+bash "${CLAUDE_HOME:-$HOME/.claude}/skills/tts-lychee/scripts/run.sh" --search-voices "$ARGUMENTS"
 ```
 
 如果没有匹配项，明确告诉用户当前服务端没有返回候选，不要静默替换音色。

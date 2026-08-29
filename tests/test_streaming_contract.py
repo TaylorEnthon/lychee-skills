@@ -17,7 +17,7 @@ from lychee_tts.protocol import (
     make_optional,
     parse_response,
 )
-from lychee_tts.streaming import StreamingTtsClient
+from lychee_tts.streaming import StreamResult, StreamingTtsClient, split_text
 import tts_client
 
 
@@ -159,3 +159,88 @@ def test_error_information_frame_reads_error_code_after_header():
 
     assert result["error_code"] == 45000001
     assert result["payload"] == payload
+
+
+def test_long_text_is_segmented_before_the_provider_limit():
+    segments = split_text("测" * 1001)
+
+    assert [len(segment) for segment in segments] == [1000, 1]
+
+
+def test_continuous_frames_do_not_hit_a_total_wall_clock_timeout(monkeypatch):
+    trace = []
+
+    class Clock:
+        now = 0.0
+
+        def monotonic(self):
+            return self.now
+
+    clock = Clock()
+    incoming = [
+        response_packet(FULL_SERVER_RESPONSE, EVENT_CONNECTION_STARTED),
+        response_packet(FULL_SERVER_RESPONSE, EVENT_SESSION_STARTED),
+        response_packet(AUDIO_ONLY_RESPONSE, EVENT_TTS_RESPONSE, payload=b"\x01\x00"),
+        response_packet(AUDIO_ONLY_RESPONSE, EVENT_TTS_RESPONSE, payload=b"\x02\x00"),
+        response_packet(FULL_SERVER_RESPONSE, EVENT_SESSION_FINISHED),
+        response_packet(FULL_SERVER_RESPONSE, EVENT_CONNECTION_FINISHED),
+    ]
+
+    class AdvancingWebSocket(FakeWebSocket):
+        def recv(self):
+            clock.now += 20
+            return super().recv()
+
+    socket = AdvancingWebSocket(incoming, trace)
+    monkeypatch.setattr("lychee_tts.streaming.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("lychee_tts.streaming.websocket.create_connection", lambda *args, **kwargs: socket)
+
+    result = StreamingTtsClient(api_key="test-key", timeout=30).stream(
+        "持续输出的长文本", "清新少女", FakeSink(trace)
+    )
+
+    assert result.audio_bytes == 4
+    assert result.duration_ms >= 100_000
+
+
+def test_playback_open_failure_falls_back_to_a_valid_wav(tmp_path, monkeypatch):
+    output = tmp_path / "speech.wav"
+    args = tts_client.build_parser().parse_args([
+        "--text", "你好", "--voice", "清新少女", "--output", str(output), "--play",
+    ])
+
+    class FailingPlaybackSink:
+        @staticmethod
+        def dependency_available():
+            return True
+
+        def open(self):
+            raise RuntimeError("没有可用的输出设备")
+
+        def write(self, chunk):
+            raise AssertionError("failed playback must not receive data")
+
+        def close(self, success):
+            pass
+
+    class FakeStreamingClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def stream(self, text, speaker_id, sink, on_event=None):
+            sink.open()
+            sink.write(b"\x01\x00\x02\x00")
+            sink.close(True)
+            return StreamResult(4, 10, 5, 1)
+
+    monkeypatch.setattr(tts_client, "build_api", lambda args: SimpleNamespace())
+    monkeypatch.setattr(tts_client, "resolve_voice", lambda args, api: ("清新少女", "清新少女", "public"))
+    monkeypatch.setattr(tts_client, "PlaybackSink", FailingPlaybackSink)
+    monkeypatch.setattr(tts_client, "StreamingTtsClient", FakeStreamingClient)
+
+    result = tts_client.run_speak(args)
+
+    assert output.exists()
+    assert result["success"] is True
+    assert result["played"] is False
+    assert any("输出设备" in warning for warning in result["warnings"])
