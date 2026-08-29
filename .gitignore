@@ -5,6 +5,7 @@
 # IDE
 .idea/
 .vscode/
+.worktrees/
 
 # Python cache
 __pycache__/
