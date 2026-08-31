@@ -61,8 +61,9 @@ def test_clone_url_preserves_audio_extension_for_provider_validation(tmp_path: P
             return CloneResult(speaker_id="clone-request-123", request_id="clone-request-123")
 
     monkeypatch.setattr("tts_client.build_api", lambda args: Api())
+    preview_url = "https://example.test/design-preview.wav?permanent=value%2Bplus"
     args = build_parser().parse_args([
-        "--clone-url", "https://example.test/design-preview.wav",
+        "--clone-url", preview_url,
         "--clone-name", "我的声音",
         "--confirm-clone",
         "--registry", str(tmp_path / "voices.json"),
@@ -73,6 +74,7 @@ def test_clone_url_preserves_audio_extension_for_provider_validation(tmp_path: P
     assert result["success"] is True
     assert captured["download_destination"].suffix == ".wav"
     assert captured["clone_path"].suffix == ".wav"
+    assert VoiceRegistry(tmp_path / "voices.json").get("我的声音").preview_audio_url == preview_url
 
 
 def test_public_voice_name_wins_over_colliding_personal_alias(tmp_path: Path):

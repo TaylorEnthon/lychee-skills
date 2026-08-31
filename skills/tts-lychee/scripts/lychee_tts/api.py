@@ -6,8 +6,9 @@ import ipaddress
 import mimetypes
 import os
 import re
+import socket
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 try:
     import requests
@@ -16,9 +17,67 @@ except ImportError:  # pragma: no cover - exercised by doctor instead
 
 
 DEFAULT_BASE_URL = "https://voice.lycheeai.com.cn"
-DEFAULT_PAGE_SIZE = 100
+DEFAULT_PAGE_SIZE = 1000
 MAX_PAGE_SIZE = 1000
 MAX_AUDIO_BYTES = 50 * 1024 * 1024
+
+
+def _validated_remote_url(url: str) -> str:
+    parsed = urlparse(url or "")
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("试听音频地址不是有效的 HTTP/HTTPS URL")
+    hostname = (parsed.hostname or "").casefold()
+    if hostname == "localhost" or hostname.endswith(".localhost") or hostname.endswith(".local"):
+        raise ValueError("试听音频地址不能指向本机或私有网络")
+
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError as exc:
+        raise ValueError("试听音频地址端口无效") from exc
+
+    try:
+        literal = ipaddress.ip_address(hostname)
+    except ValueError:
+        literal = None
+
+    if literal is not None:
+        addresses = [literal]
+    else:
+        try:
+            resolved = socket.getaddrinfo(
+                hostname,
+                port,
+                type=socket.SOCK_STREAM,
+            )
+        except OSError as exc:
+            raise ValueError("试听音频地址无法解析") from exc
+        addresses = []
+        for item in resolved:
+            try:
+                address_text = str(item[4][0]).split("%", 1)[0]
+                address = ipaddress.ip_address(address_text)
+            except (IndexError, TypeError, ValueError) as exc:
+                raise ValueError("试听音频地址解析结果无效") from exc
+            if address not in addresses:
+                addresses.append(address)
+
+    if not addresses or any(not address.is_global for address in addresses):
+        raise ValueError("试听音频地址不能指向本机或私有网络")
+    return url
+
+
+def _supported_audio_file(path: Path) -> bool:
+    try:
+        with Path(path).open("rb") as source:
+            header = source.read(16)
+    except OSError:
+        return False
+    is_wav = header.startswith(b"RIFF") and len(header) >= 12 and header[8:12] == b"WAVE"
+    is_mp3 = header.startswith(b"ID3") or (
+        len(header) >= 2 and header[0] == 0xFF and header[1] & 0xE0 == 0xE0
+    )
+    is_mp4 = len(header) >= 12 and header[4:8] == b"ftyp"
+    return is_wav or is_mp3 or is_mp4
 
 
 class LycheeApiError(RuntimeError):
@@ -345,8 +404,9 @@ class LycheeApiClient:
             },
         )
         data = payload.get("data") or {}
-        audio_url = str(data.get("audio_url") or "").strip()
-        if not audio_url:
+        raw_audio_url = data.get("audio_url")
+        audio_url = "" if raw_audio_url is None else str(raw_audio_url)
+        if not audio_url.strip():
             raise LycheeApiError("音色设计未返回试听音频")
         return DesignResult(
             audio_url=audio_url,
@@ -401,41 +461,49 @@ class LycheeApiClient:
         )
 
     def download_audio(self, url: str, destination: Path) -> Path:
-        parsed = urlparse(url or "")
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("试听音频地址不是有效的 HTTP/HTTPS URL")
-        hostname = (parsed.hostname or "").casefold()
-        if hostname == "localhost" or hostname.endswith(".localhost") or hostname.endswith(".local"):
-            raise ValueError("试听音频地址不能指向本机或私有网络")
-        try:
-            address = ipaddress.ip_address(hostname)
-        except ValueError:
-            address = None
-        if address is not None and not address.is_global:
-            raise ValueError("试听音频地址不能指向本机或私有网络")
+        _validated_remote_url(url)
         if requests is None:
             raise LycheeApiError("缺少 requests 依赖")
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
+        response = None
         try:
-            response = requests.get(url, stream=True, timeout=self.timeout, headers={"Accept": "audio/*"})
+            current_url = url
+            for _redirect_count in range(6):
+                response = requests.get(
+                    current_url,
+                    stream=True,
+                    timeout=self.timeout,
+                    headers={"Accept": "audio/*"},
+                    allow_redirects=False,
+                )
+                status_code = int(getattr(response, "status_code", 200) or 200)
+                if status_code not in {301, 302, 303, 307, 308}:
+                    break
+                headers = getattr(response, "headers", {}) or {}
+                location = headers.get("Location") or headers.get("location")
+                if not location:
+                    raise LycheeApiError("试听音频重定向响应缺少 Location")
+                next_url = urljoin(current_url, str(location))
+                try:
+                    _validated_remote_url(next_url)
+                except ValueError as exc:
+                    raise LycheeApiError("试听音频重定向到了无效地址或私有网络") from exc
+                close = getattr(response, "close", None)
+                if callable(close):
+                    close()
+                response = None
+                current_url = next_url
+            else:
+                raise LycheeApiError("试听音频重定向次数过多")
+
+            if response is None:
+                raise LycheeApiError("试听音频下载未返回响应")
             response.raise_for_status()
-            final_url = getattr(response, "url", url)
-            final_parsed = urlparse(final_url)
-            final_hostname = (final_parsed.hostname or "").casefold()
             try:
-                final_address = ipaddress.ip_address(final_hostname)
-            except ValueError:
-                final_address = None
-            if (
-                final_parsed.scheme not in {"http", "https"}
-                or not final_parsed.netloc
-                or final_hostname == "localhost"
-                or final_hostname.endswith(".localhost")
-                or final_hostname.endswith(".local")
-                or (final_address is not None and not final_address.is_global)
-            ):
-                raise LycheeApiError("试听音频重定向到了本机或私有网络")
+                _validated_remote_url(str(getattr(response, "url", None) or current_url))
+            except ValueError as exc:
+                raise LycheeApiError("试听音频重定向到了无效地址或私有网络") from exc
             total = 0
             with destination.open("wb") as output:
                 for chunk in response.iter_content(chunk_size=64 * 1024):
@@ -445,6 +513,8 @@ class LycheeApiClient:
                     if total > MAX_AUDIO_BYTES:
                         raise LycheeApiError("音频文件超过 50 MB 限制")
                     output.write(chunk)
+            if not _supported_audio_file(destination):
+                raise LycheeApiError("下载内容不是支持的音频格式（仅支持 WAV、MP3、M4A）")
         except Exception as exc:
             if destination.exists():
                 destination.unlink()
@@ -453,4 +523,9 @@ class LycheeApiClient:
             if requests is not None and isinstance(exc, requests.RequestException):
                 raise LycheeApiError("下载试听音频失败") from exc
             raise
+        finally:
+            if response is not None:
+                close = getattr(response, "close", None)
+                if callable(close):
+                    close()
         return destination

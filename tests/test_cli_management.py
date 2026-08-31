@@ -5,8 +5,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
+import pytest
+
+from lychee_tts.api import PublicVoice
 from lychee_tts.registry import StoredVoice, VoiceRegistry
+import tts_client
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,3 +124,53 @@ def test_personal_voice_alias_can_be_renamed_after_confirmation(tmp_path: Path):
     assert registry.get("旧名字") is None
     assert registry.get("新名字").speaker_id == "private-id"
     assert "private-id" not in renamed.stdout
+
+
+def test_compact_catalog_slice_keeps_descriptions_and_reports_more(monkeypatch):
+    voices = [
+        PublicVoice(
+            name=f"voice-{index}",
+            description=f"description-{index}",
+            lang_code="zh",
+            audio_url=f"https://audio.example/{index}.wav",
+        )
+        for index in range(4)
+    ]
+    monkeypatch.setattr(
+        tts_client,
+        "build_api",
+        lambda args: SimpleNamespace(list_all_public_voices=lambda: voices),
+    )
+    args = tts_client.build_parser().parse_args(
+        ["--list-voices", "--compact", "--offset", "1", "--limit", "2"]
+    )
+
+    result = tts_client.run_list_voices(args)
+
+    assert result["catalog_total"] == 4
+    assert result["total"] == 2
+    assert result["returned"] == 2
+    assert result["offset"] == 1
+    assert result["has_more"] is True
+    assert result["voices"][0]["description"] == "description-1"
+    assert "audio_url" not in result["voices"][0]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--list-voices", "--offset", "-1"],
+        ["--list-voices", "--limit", "0"],
+        ["--list-voices", "--limit", "-1"],
+    ],
+)
+def test_catalog_slice_rejects_invalid_bounds(arguments, monkeypatch):
+    monkeypatch.setattr(
+        tts_client,
+        "build_api",
+        lambda args: SimpleNamespace(list_all_public_voices=lambda: []),
+    )
+    args = tts_client.build_parser().parse_args(arguments)
+
+    with pytest.raises(ValueError):
+        tts_client.run_list_voices(args)

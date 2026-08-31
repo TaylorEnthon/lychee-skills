@@ -74,17 +74,37 @@ def resolve_voice(args: argparse.Namespace, api: LycheeApiClient) -> Tuple[str, 
 
 
 def run_list_voices(args: argparse.Namespace) -> Dict[str, Any]:
+    if args.offset < 0:
+        raise ValueError("--offset 不能小于 0")
+    if args.limit is not None and args.limit <= 0:
+        raise ValueError("--limit 必须大于 0")
     api = build_api(args)
     query = args.search_voices or args.voice_query
     if query:
         matches = api.search_public_voice_matches(query)
-        voices = [match.to_dict() for match in matches]
+        records = [match.to_dict() for match in matches]
     else:
-        voices = [voice.to_dict() for voice in api.list_all_public_voices()]
+        records = [voice.to_dict() for voice in api.list_all_public_voices()]
+    catalog_total = len(records)
+    end = None if args.limit is None else args.offset + args.limit
+    voices = records[args.offset:end]
+    if args.compact:
+        voices = [
+            {
+                key: record[key]
+                for key in ("name", "description", "lang_code", "match")
+                if key in record
+            }
+            for record in voices
+        ]
     return {
         "success": True,
         "query": query or "",
+        "catalog_total": catalog_total,
         "total": len(voices),
+        "returned": len(voices),
+        "offset": args.offset,
+        "has_more": args.offset + len(voices) < catalog_total,
         "voices": voices,
     }
 
@@ -336,6 +356,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--list-voices", action="store_true")
     parser.add_argument("--search-voices", metavar="NAME")
     parser.add_argument("--voice-query", metavar="NAME")
+    parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--offset", type=int, default=0)
+    parser.add_argument("--limit", type=int)
     parser.add_argument("--list-personal-voices", action="store_true")
     parser.add_argument("--remove-personal-voice", metavar="ALIAS")
     parser.add_argument("--confirm-remove", action="store_true")
@@ -409,6 +432,9 @@ def select_operation(args: argparse.Namespace) -> str:
     )
     if operation != "clone" and any(value is not None and value is not False for value in clone_modifiers):
         raise ValueError("克隆参数只能与 --clone-audio 或 --clone-url 一起使用")
+    catalog_modifiers = (args.compact, args.offset != 0, args.limit is not None)
+    if operation != "public_voices" and any(catalog_modifiers):
+        raise ValueError("目录分页参数只能与公共音色查询一起使用")
     speak_modifiers = (
         args.voice,
         args.public_voice,
