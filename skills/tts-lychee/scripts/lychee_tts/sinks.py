@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 import os
+import queue
+import threading
 import wave
 from typing import Any, Iterable, List, Optional, Protocol, Tuple
 
@@ -18,12 +21,20 @@ class AudioSink(Protocol):
 
 
 class WaveFileSink:
-    def __init__(self, output_path: Path, sample_rate: int = 16000, overwrite: bool = False):
+    def __init__(
+        self,
+        output_path: Path,
+        sample_rate: int = 16000,
+        overwrite: bool = False,
+        preserve_on_failure: bool = False,
+    ):
         self.output_path = Path(output_path)
         self.sample_rate = sample_rate
         self.overwrite = overwrite
+        self.preserve_on_failure = preserve_on_failure
         suffix = self.output_path.suffix or ".wav"
         self.partial_path = self.output_path.with_name(f"{self.output_path.stem}.part{suffix}")
+        self.failure_path: Optional[Path] = None
         self._writer: Optional[wave.Wave_write] = None
         self.bytes_written = 0
 
@@ -38,6 +49,7 @@ class WaveFileSink:
         self._writer.setsampwidth(2)
         self._writer.setframerate(self.sample_rate)
         self.bytes_written = 0
+        self.failure_path = None
 
     def write(self, chunk: bytes) -> None:
         if self._writer is None:
@@ -55,8 +67,119 @@ class WaveFileSink:
             writer.close()
         if success:
             os.replace(str(self.partial_path), str(self.output_path))
+        elif self.preserve_on_failure and self.bytes_written > 0 and self.partial_path.exists():
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+            suffix = self.output_path.suffix or ".wav"
+            candidate = self.output_path.with_name(
+                f"{self.output_path.stem}.partial-{timestamp}{suffix}"
+            )
+            counter = 1
+            while candidate.exists():
+                candidate = self.output_path.with_name(
+                    f"{self.output_path.stem}.partial-{timestamp}-{counter}{suffix}"
+                )
+                counter += 1
+            os.replace(str(self.partial_path), str(candidate))
+            self.failure_path = candidate
         elif self.partial_path.exists():
             self.partial_path.unlink()
+
+
+class QueuedSink:
+    """Write to a potentially slow sink on a bounded worker queue."""
+
+    _STOP = object()
+
+    def __init__(self, sink: AudioSink, max_chunks: int = 64):
+        if max_chunks < 1:
+            raise ValueError("max_chunks 必须大于 0")
+        self.sink = sink
+        self._queue: queue.Queue[Any] = queue.Queue(maxsize=max_chunks)
+        self._worker: Optional[threading.Thread] = None
+        self._worker_error: Optional[Exception] = None
+        self._opened = False
+
+    def open(self) -> None:
+        if self._opened:
+            raise RuntimeError("队列 Sink 已打开")
+        self.sink.open()
+        self._worker_error = None
+        self._opened = True
+        self._worker = threading.Thread(
+            target=self._run,
+            name="lychee-tts-audio-sink",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def write(self, chunk: bytes) -> None:
+        if not self._opened:
+            raise RuntimeError("队列 Sink 尚未打开")
+        data = bytes(chunk)
+        if not data:
+            return
+        self._put(data)
+
+    def close(self, success: bool) -> None:
+        if not self._opened:
+            return
+        self._opened = False
+        worker = self._worker
+        self._worker = None
+
+        effective_success = bool(success) and self._worker_error is None
+        if not effective_success:
+            self._discard_pending()
+        try:
+            self._put(self._STOP, allow_closed=True)
+        except Exception:
+            effective_success = False
+            self._discard_pending()
+            self._queue.put_nowait(self._STOP)
+
+        if worker is not None:
+            worker.join()
+
+        worker_error = self._worker_error
+        try:
+            self.sink.close(effective_success and worker_error is None)
+        finally:
+            if worker_error is not None:
+                raise RuntimeError(f"异步音频输出失败：{worker_error}") from worker_error
+
+    def _run(self) -> None:
+        while True:
+            item = self._queue.get()
+            try:
+                if item is self._STOP:
+                    return
+                self.sink.write(item)
+            except Exception as exc:
+                self._worker_error = exc
+                return
+            finally:
+                self._queue.task_done()
+
+    def _put(self, item: Any, allow_closed: bool = False) -> None:
+        while True:
+            if not allow_closed and not self._opened:
+                raise RuntimeError("队列 Sink 尚未打开")
+            if self._worker_error is not None:
+                raise RuntimeError(f"异步音频输出失败：{self._worker_error}") from self._worker_error
+            try:
+                self._queue.put(item, timeout=0.05)
+                return
+            except queue.Full:
+                continue
+
+    def _discard_pending(self) -> None:
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                return
+            else:
+                self._queue.task_done()
 
 
 class PlaybackSink:

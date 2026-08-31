@@ -29,7 +29,13 @@ from lychee_tts.contracts import (  # noqa: E402
     result_record,
 )
 from lychee_tts.registry import StoredVoice, VoiceRegistry  # noqa: E402
-from lychee_tts.sinks import BestEffortSink, PlaybackSink, TeeSink, WaveFileSink  # noqa: E402
+from lychee_tts.sinks import (  # noqa: E402
+    BestEffortSink,
+    PlaybackSink,
+    QueuedSink,
+    TeeSink,
+    WaveFileSink,
+)
 from lychee_tts.streaming import StreamingTtsClient  # noqa: E402
 from lychee_tts.voices import VoiceResolver  # noqa: E402
 
@@ -266,12 +272,18 @@ def run_speak(args: argparse.Namespace) -> Dict[str, Any]:
     if output_path.suffix.lower() != ".wav":
         raise ValueError("真流式模式输出必须使用 .wav 文件")
 
-    sinks = [WaveFileSink(output_path, overwrite=args.overwrite)]
+    sinks = [
+        WaveFileSink(
+            output_path,
+            overwrite=args.overwrite,
+            preserve_on_failure=True,
+        )
+    ]
     warnings = []
     playback: Optional[BestEffortSink] = None
     if args.play:
         if PlaybackSink.dependency_available():
-            playback = BestEffortSink(PlaybackSink())
+            playback = BestEffortSink(QueuedSink(PlaybackSink(), max_chunks=64))
             sinks.append(playback)
         else:
             warnings.append("实时播放依赖或输出设备不可用，已改为只生成 WAV")
