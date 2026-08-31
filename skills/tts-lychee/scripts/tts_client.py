@@ -24,6 +24,12 @@ from lychee_tts.api import (  # noqa: E402
     PublicVoice,
     VoiceSelectionError,
 )
+from lychee_tts.contracts import (  # noqa: E402
+    error_record,
+    event_record,
+    new_run_id,
+    result_record,
+)
 from lychee_tts.registry import StoredVoice, VoiceRegistry  # noqa: E402
 from lychee_tts.sinks import BestEffortSink, PlaybackSink, TeeSink, WaveFileSink  # noqa: E402
 from lychee_tts.streaming import StreamingTtsClient  # noqa: E402
@@ -247,14 +253,16 @@ def run_speak(args: argparse.Namespace) -> Dict[str, Any]:
     operation_started = time.monotonic()
 
     def progress(name: str, details: Dict[str, Any]) -> None:
-        if not args.progress:
+        if not args.progress and not args.jsonl:
             return
-        payload = {"event": name, **details}
+        payload = dict(details)
         if name == "first_audio":
             payload["end_to_end_first_audio_ms"] = int(
                 (time.monotonic() - operation_started) * 1000
             )
-        print(json.dumps(payload, ensure_ascii=False), file=sys.stderr)
+        record = event_record("speak", args.run_id, name, payload)
+        destination = sys.stdout if args.jsonl else sys.stderr
+        print(json.dumps(record, ensure_ascii=False), file=destination, flush=True)
 
     progress("voice_resolution_started", {})
     resolution_started = time.monotonic()
@@ -338,6 +346,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--play", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--progress", action="store_true", help="将流式进度事件输出到 stderr")
+    parser.add_argument("--jsonl", action="store_true", help="将进度与最终结果作为 JSON Lines 输出到 stdout")
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--base-url", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--ws-url", default=None, help=argparse.SUPPRESS)
@@ -420,6 +429,8 @@ def select_operation(args: argparse.Namespace) -> str:
 def main() -> int:
     configure_stdio()
     args = build_parser().parse_args()
+    args.run_id = new_run_id()
+    operation = "unknown"
     try:
         operation = select_operation(args)
         if operation == "doctor":
@@ -444,16 +455,30 @@ def main() -> int:
             if not args.text:
                 raise ValueError("text is required")
             result = run_speak(args)
-        print(json.dumps(result, ensure_ascii=False))
+        output = result_record(operation, args.run_id, result)
+        print(json.dumps(output, ensure_ascii=False))
         return 0 if result.get("success") else 1
+    except KeyboardInterrupt as exc:
+        output = error_record(operation, args.run_id, exc)
+        destination = sys.stdout if args.jsonl else sys.stderr
+        print(json.dumps(output, ensure_ascii=False), file=destination)
+        return 130
     except VoiceSelectionError as exc:
-        output: Dict[str, Any] = {"success": False, "error": str(exc)}
+        output = error_record(operation, args.run_id, exc)
+        output.update({
+            "error_code": "voice_selection_failed",
+            "stage": "voice_resolution",
+            "retryable": False,
+        })
         if exc.candidates:
             output["candidates"] = [voice.to_dict() for voice in exc.candidates]
-        print(json.dumps(output, ensure_ascii=False), file=sys.stderr)
+        destination = sys.stdout if args.jsonl else sys.stderr
+        print(json.dumps(output, ensure_ascii=False), file=destination)
         return 2
     except Exception as exc:
-        print(json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        output = error_record(operation, args.run_id, exc)
+        destination = sys.stdout if args.jsonl else sys.stderr
+        print(json.dumps(output, ensure_ascii=False), file=destination)
         return 1
 
 
