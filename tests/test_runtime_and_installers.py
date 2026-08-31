@@ -138,6 +138,48 @@ def test_powershell_launcher_prefers_the_skill_owned_runtime(isolated_runtime):
     assert_doctor_uses(result, venv_python(venv_dir))
 
 
+def test_explicit_tts_python_remains_higher_priority_than_the_skill_runtime(
+    isolated_runtime,
+):
+    runtime_root, _venv_dir = isolated_runtime
+    env = os.environ.copy()
+    env["TTS_RUNTIME_HOME"] = str(runtime_root)
+    env["TTS_PYTHON"] = sys.executable
+    env["TTS_API_KEY"] = "test-key"
+
+    if os.name == "nt":
+        powershell = shutil.which("pwsh") or shutil.which("powershell")
+        if not powershell:
+            pytest.skip("PowerShell is unavailable")
+        command = [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(SKILL / "scripts" / "run.ps1"),
+            "--doctor",
+        ]
+    else:
+        bash = shutil.which("bash")
+        if not bash:
+            pytest.skip("Bash is unavailable")
+        env["TTS_RUNTIME_HOME"] = as_bash_path(runtime_root)
+        command = [bash, str(SKILL / "scripts" / "run.sh"), "--doctor"]
+
+    result = subprocess.run(
+        command,
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+
+    assert_doctor_uses(result, Path(sys.executable))
+
+
 def test_bash_installer_supports_the_cross_agent_skills_directory():
     bash = shutil.which("bash")
     if not bash:

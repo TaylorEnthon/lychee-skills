@@ -82,8 +82,10 @@ install_skill() {
   fi
 
   echo "Installed skill: $skill_target"
+  echo "The launcher keeps dependencies in its own ~/.lychee/tts-lychee runtime."
   echo "Install core dependencies: bash \"$skill_target/scripts/run.sh\" --install-deps"
   echo "Optional live playback: bash \"$skill_target/scripts/run.sh\" --install-playback"
+  echo "Verify setup: bash \"$skill_target/scripts/run.sh\" --doctor"
 }
 
 if [[ "$TARGET" == "claude" || "$TARGET" == "all" ]]; then

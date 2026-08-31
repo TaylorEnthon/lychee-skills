@@ -6,11 +6,13 @@
 
 - 公共音色实时来自 `GET https://voice.lycheeai.com.cn/openapi/voice-list`，不打包固定音色表。
 - 支持按名称、描述和语言预筛；自然语言需求由 Agent 阅读实时描述后做最终语义选择。
+- 公共音色和个人音色显式区分，同时保留旧 `--voice` 调用兼容性。
 - 支持 `POST /openapi/voice-design` 设计试听和 `POST /openapi/tts/clone` 克隆。
 - 克隆响应的 `request_id` 保存为个人音色的 TTS `speaker_id`。
 - TTS 使用 `wss://voice.lycheeai.com.cn/openapi/tts/ws_binary/v2`。
-- 真流式参数固定为 PCM、16000 Hz、speed 1.0；首块音频立即写入并可立即播放。
-- 长文本按自然标点分段；播放设备失败不会破坏已经生成的 WAV。
+- 真流式参数固定为 PCM、16000 Hz、speed 1.0；首块音频立即写入，播放由独立队列消费。
+- 长文本按自然标点分段；播放设备失败不会破坏 WAV，中途断流会保留可播放的部分 WAV。
+- 结果、事件和错误使用版本化 Agent 契约，也可选择 JSON Lines 增量输出。
 
 ## Agent 兼容性
 
@@ -32,7 +34,7 @@ Skill 核心遵循通用 Agent Skills 目录结构，不依赖 Claude、Codex �
 - 核心依赖：`websocket-client`、`requests`
 - 可选实时声卡播放：`sounddevice`
 
-不要直接假设系统命令叫 `python` 或 `python3`。Skill 内的 `scripts/run.ps1` 和 `scripts/run.sh` 会探测并验证可执行的 Python，也会避开 WindowsApps 占位程序。
+不要直接假设系统命令叫 `python` 或 `python3`。Skill 内的 `scripts/run.ps1` 和 `scripts/run.sh` 会探测并验证可执行的 Python，也会避开 WindowsApps 占位程序。安装依赖后默认使用 `~/.lychee/tts-lychee/runtime/venv` 隔离环境；可通过 `TTS_RUNTIME_HOME` 改变位置，显式 `TTS_PYTHON` 仍具有最高优先级。
 
 ## 安装
 
@@ -104,7 +106,7 @@ bash "$HOME/.agents/skills/tts-lychee/scripts/run.sh" --install-playback  # 可�
 bash "$HOME/.agents/skills/tts-lychee/scripts/run.sh" --doctor
 ```
 
-使用 `claude` 或 `codex` target 时，把示例中的 `.agents` 换成对应目录。doctor 不调用在线 TTS，也不产生音频费用。
+使用 `claude` 或 `codex` target 时，把示例中的 `.agents` 换成对应目录。launcher 会自动创建和复用 Skill 自己的 venv，不修改项目环境。doctor 不调用在线 TTS，也不产生音频费用。
 
 ## 配置 API Key
 
@@ -136,17 +138,18 @@ export TTS_API_KEY="你的API密钥"
 用“我的专业女声”朗读这段内容并保存 WAV。
 ```
 
-未指定音色时，Skill 会询问或展示实时服务端候选；不会使用固定默认音色。音色设计会先返回试听，用户确认后才克隆。
+未指定音色时，Skill 会查询实时 `description` 并展示 2–5 个候选；不会使用固定默认音色。普通查询、合成、保存和播放无需技术确认。音色设计会先返回长期可访问的试听 URL，保留全部查询参数，用户确认声音后才克隆。
 
 ## 客户端操作
 
 下面用 `<launcher>` 表示当前平台的 `scripts/run.ps1` 或 `scripts/run.sh`。
 
 ```text
-<launcher> --list-voices
-<launcher> --search-voices "纪录片"
+<launcher> --list-voices --compact --offset 0 --limit 100
+<launcher> --search-voices "纪录片" --compact --offset 0 --limit 100
 <launcher> --list-personal-voices
-<launcher> --text "欢迎使用实时语音合成。" --voice "靖轩" --play --progress --output "welcome.wav"
+<launcher> --text "欢迎使用实时语音合成。" --public-voice "靖轩" --play --progress --output "welcome.wav"
+<launcher> --text "欢迎回来。" --personal-voice "我的专业女声" --output "personal.wav"
 <launcher> --design-description "清晰、亲切、专业的女性声音" --design-text "晚上好，今天辛苦了。"
 <launcher> --clone-url "设计接口返回的试听地址" --clone-name "我的专业女声" --confirm-clone
 <launcher> --rename-personal-voice "旧名字" --new-personal-voice-name "新名字" --confirm-rename
@@ -157,7 +160,7 @@ export TTS_API_KEY="你的API密钥"
 
 ## 真流式结果
 
-标准输出最终返回 JSON；`--progress` 会把连接、发送文本、首块音频和分段完成事件增量写到 stderr。主要字段包括：
+标准输出最终返回带 `schema_version`、`type`、`operation` 和 `run_id` 的 JSON；旧业务字段保持不变。`--progress` 会把连接、发送文本、首块音频和分段完成事件增量写到 stderr。需要单一机器可读流时可选 `--jsonl`。主要字段包括：
 
 - `output`：最终 WAV 绝对路径。
 - `first_audio_ms`：进入 WebSocket 流程后的首音频耗时。
@@ -166,7 +169,7 @@ export TTS_API_KEY="你的API密钥"
 - `played`：本机声卡播放是否完整成功。
 - `warnings`：播放降级等不影响 WAV 的提示。
 
-流式中途失败不会提交损坏的 partial WAV。只有可选播放 Adapter 失败时，WAV 会继续生成并返回 warning。
+首个音频字节前的临时连接错误会自动重试一次；收到音频后不再重试。取消或中途失败且已有有效 PCM 时，错误结果通过 `partial_output` 返回一个可播放但可能不完整的 WAV。可选播放失败不会中断网络接收或 WAV 写入，只会返回 warning。
 
 ## 开发验证
 
@@ -175,7 +178,7 @@ python -m pytest -q
 bash -n install.sh skills/tts-lychee/doctor.sh skills/tts-lychee/scripts/run.sh
 ```
 
-CI 在 Linux 和 Windows 上验证核心测试、安装脚本及运行启动器。
+CI 在 Python 3.8、3.11、3.13 和 Windows PowerShell 5.1/7 上验证核心测试、安装脚本及运行启动器。
 
 ## License
 

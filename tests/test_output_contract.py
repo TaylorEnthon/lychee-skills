@@ -139,3 +139,26 @@ def test_keyboard_interrupt_has_a_stable_cancelled_contract():
     assert result["error_code"] == "cancelled"
     assert result["stage"] == "streaming"
     assert result["retryable"] is False
+
+
+def test_cli_keyboard_interrupt_returns_130(monkeypatch, capsys):
+    def interrupted(args):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(tts_client, "run_speak", interrupted)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "tts_client.py",
+            "--text",
+            "会被取消",
+            "--public-voice",
+            "测试音色",
+        ],
+    )
+
+    assert tts_client.main() == 130
+    payload = json.loads(capsys.readouterr().err)
+    assert payload["error_code"] == "cancelled"
+    assert payload["operation"] == "speak"

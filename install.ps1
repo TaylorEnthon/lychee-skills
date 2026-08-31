@@ -64,8 +64,10 @@ function Install-LycheeSkill {
     }
 
     Write-Host "Installed skill: $SkillTarget"
+    Write-Host "The launcher keeps dependencies in its own ~/.lychee/tts-lychee runtime."
     Write-Host "Install core dependencies: & `"$(Join-Path $SkillTarget 'scripts\run.ps1')`" --install-deps"
     Write-Host "Optional live playback: & `"$(Join-Path $SkillTarget 'scripts\run.ps1')`" --install-playback"
+    Write-Host "Verify setup: & `"$(Join-Path $SkillTarget 'scripts\run.ps1')`" --doctor"
 }
 
 if ($Target -eq "claude" -or $Target -eq "all") {
