@@ -159,7 +159,7 @@ Failure after PCM
 - Existing no-argument installers still target Claude.
 - Existing `claude`, `codex`, `agents`, and `all` targets remain.
 - Existing `npx skills add` layout remains valid.
-- Existing `TTS_API_KEY`, `TTS_PYTHON`, `TTS_BASE_URL`, `TTS_WS_URL`, and `TTS_VOICE_REGISTRY` behavior remains.
+- Existing `LYCHEE_API_KEY`, `TTS_PYTHON`, `TTS_BASE_URL`, `TTS_WS_URL`, and `TTS_VOICE_REGISTRY` behavior remains.
 - Existing `--voice`, `--progress`, voice design, clone, list, rename, remove, output, and playback commands remain.
 - Existing top-level JSON fields remain; new structured fields are additive.
 - The complete preview URL remains persisted and returned for personal voices.

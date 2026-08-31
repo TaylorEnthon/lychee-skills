@@ -157,7 +157,7 @@ class LycheeApiClient:
         timeout: int = 30,
     ):
         self.base_url = (base_url or os.getenv("TTS_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
-        self.api_key = api_key or os.getenv("TTS_API_KEY")
+        self.api_key = api_key or os.getenv("LYCHEE_API_KEY")
         self.timeout = timeout
         self.session = session
 
@@ -173,7 +173,7 @@ class LycheeApiClient:
 
     def _headers(self, content_type: Optional[str] = None) -> Dict[str, str]:
         if not self.api_key:
-            raise LycheeApiError("TTS_API_KEY 未配置")
+            raise LycheeApiError("LYCHEE_API_KEY 未配置")
         headers = {"api_key": self.api_key, "Accept": "application/json"}
         if content_type:
             headers["Content-Type"] = content_type

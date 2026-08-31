@@ -4,8 +4,8 @@ description: Use when a user asks to synthesize, stream, play, or save speech; d
 metadata:
   openclaw:
     requires:
-      env: ["TTS_API_KEY"]
-    primaryEnv: "TTS_API_KEY"
+      env: ["LYCHEE_API_KEY"]
+    primaryEnv: "LYCHEE_API_KEY"
 ---
 
 # TTS Lychee
@@ -100,5 +100,5 @@ Bash:               bash "{baseDir}/scripts/run.sh"
 
 - API：`https://voice.lycheeai.com.cn`；实时端点：`wss://voice.lycheeai.com.cn/openapi/tts/ws_binary/v2`。
 - 真流式内部固定为 PCM16 单声道、16000 Hz、speed 1.0；这些不是用户选项。PCM 到达即写 WAV，可选播放通过队列并行消费。
-- `TTS_API_KEY` 只从环境变量读取，不能放入参数、日志、文件或回复。
+- `LYCHEE_API_KEY` 只从环境变量读取，不能放入参数、日志、文件或回复。
 - 从 URL 克隆前校验公网地址、重定向和 WAV/MP3/M4A 文件格式，但注册表中的设计 URL 保留原值。

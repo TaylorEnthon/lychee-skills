@@ -30,7 +30,7 @@ Skill 核心遵循通用 Agent Skills 目录结构，不依赖 Claude、Codex �
 ## 环境要求
 
 - Python 3.8+
-- 环境变量 `TTS_API_KEY`
+- 环境变量 `LYCHEE_API_KEY`
 - 核心依赖：`websocket-client`、`requests`
 - 可选实时声卡播放：`sounddevice`
 
@@ -110,18 +110,18 @@ bash "$HOME/.agents/skills/tts-lychee/scripts/run.sh" --doctor
 
 ## 配置 API Key
 
-从 [voice.lycheeai.com.cn](https://voice.lycheeai.com.cn/) 获取 API Key，并设置为 `TTS_API_KEY`。
+从 [voice.lycheeai.com.cn](https://voice.lycheeai.com.cn/) 获取 API Key，并设置为 `LYCHEE_API_KEY`。
 
 Windows：
 
 ```powershell
-setx TTS_API_KEY "你的API密钥"
+setx LYCHEE_API_KEY "你的API密钥"
 ```
 
 macOS/Linux 当前 Shell：
 
 ```bash
-export TTS_API_KEY="你的API密钥"
+export LYCHEE_API_KEY="你的API密钥"
 ```
 
 重启 Agent，使它继承新的环境变量。不要把真实 Key 放进命令参数、日志或仓库。

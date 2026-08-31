@@ -57,7 +57,7 @@ def sanitize_filename_part(value: str, max_chars: int = 20) -> str:
 def build_api(args: argparse.Namespace) -> LycheeApiClient:
     return LycheeApiClient(
         base_url=args.base_url,
-        api_key=os.getenv("TTS_API_KEY"),
+        api_key=os.getenv("LYCHEE_API_KEY"),
         timeout=args.timeout,
     )
 
@@ -252,7 +252,7 @@ def run_doctor(args: argparse.Namespace) -> Dict[str, Any]:
         playback_detail,
         required=False,
     )
-    add("TTS_API_KEY", bool(os.getenv("TTS_API_KEY")), "set" if os.getenv("TTS_API_KEY") else "missing")
+    add("LYCHEE_API_KEY", bool(os.getenv("LYCHEE_API_KEY")), "set" if os.getenv("LYCHEE_API_KEY") else "missing")
     legacy_data = SCRIPT_DIR.parent / "data"
     add(
         "legacy voice data",
@@ -311,7 +311,7 @@ def run_speak(args: argparse.Namespace) -> Dict[str, Any]:
     stream_started = time.monotonic()
     try:
         result = StreamingTtsClient(
-            api_key=os.getenv("TTS_API_KEY"),
+            api_key=os.getenv("LYCHEE_API_KEY"),
             ws_url=args.ws_url,
             timeout=args.timeout,
         ).stream(args.text, speaker_id, TeeSink(sinks), on_event=progress)

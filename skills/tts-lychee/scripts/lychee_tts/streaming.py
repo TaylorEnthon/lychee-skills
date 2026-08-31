@@ -96,7 +96,7 @@ class StreamingTtsClient:
         ws_url: Optional[str] = None,
         timeout: int = 90,
     ):
-        self.api_key = api_key or os.getenv("TTS_API_KEY")
+        self.api_key = api_key or os.getenv("LYCHEE_API_KEY")
         self.ws_url = ws_url or os.getenv("TTS_WS_URL") or DEFAULT_WS_URL
         self.timeout = timeout
 
@@ -153,7 +153,7 @@ class StreamingTtsClient:
             )
         if not self.api_key:
             raise TtsStreamError(
-                "TTS_API_KEY 未配置",
+                "LYCHEE_API_KEY 未配置",
                 error_code="authentication_missing",
                 stage="setup",
                 retryable=False,

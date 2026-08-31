@@ -80,4 +80,4 @@ if ($Target -eq "agents" -or $Target -eq "all") {
     Install-LycheeSkill -AgentHome $AgentsHome -InstallCommands $false
 }
 
-Write-Host "Set TTS_API_KEY, restart the target Agent, then ask it to synthesize or play speech."
+Write-Host "Set LYCHEE_API_KEY, restart the target Agent, then ask it to synthesize or play speech."

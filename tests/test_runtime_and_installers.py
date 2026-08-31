@@ -53,7 +53,7 @@ def assert_doctor_uses(result, expected_python: Path):
 
 def test_runtime_launcher_uses_an_available_python_from_the_skill_directory():
     env = os.environ.copy()
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     if os.name == "nt":
         powershell = shutil.which("pwsh") or shutil.which("powershell")
@@ -92,7 +92,7 @@ def test_bash_launcher_prefers_the_skill_owned_runtime(isolated_runtime):
     env = os.environ.copy()
     env.pop("TTS_PYTHON", None)
     env["TTS_RUNTIME_HOME"] = as_bash_path(runtime_root)
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     result = subprocess.run(
         [bash, str(SKILL / "scripts" / "run.sh"), "--doctor"],
@@ -115,7 +115,7 @@ def test_powershell_launcher_prefers_the_skill_owned_runtime(isolated_runtime):
     env = os.environ.copy()
     env.pop("TTS_PYTHON", None)
     env["TTS_RUNTIME_HOME"] = str(runtime_root)
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     result = subprocess.run(
         [
@@ -145,7 +145,7 @@ def test_explicit_tts_python_remains_higher_priority_than_the_skill_runtime(
     env = os.environ.copy()
     env["TTS_RUNTIME_HOME"] = str(runtime_root)
     env["TTS_PYTHON"] = sys.executable
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     if os.name == "nt":
         powershell = shutil.which("pwsh") or shutil.which("powershell")

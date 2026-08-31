@@ -98,4 +98,4 @@ if [[ "$TARGET" == "agents" || "$TARGET" == "all" ]]; then
   install_skill "$AGENTS_HOME" false
 fi
 
-echo "Set TTS_API_KEY, restart the target Agent, then ask it to synthesize or play speech."
+echo "Set LYCHEE_API_KEY, restart the target Agent, then ask it to synthesize or play speech."

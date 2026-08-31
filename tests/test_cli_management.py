@@ -32,7 +32,7 @@ def run_client(*arguments: str, env=None):
 
 def test_conflicting_operations_fail_instead_of_using_hidden_priority():
     env = os.environ.copy()
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     result = run_client("--doctor", "--list-voices", env=env)
 
@@ -42,7 +42,7 @@ def test_conflicting_operations_fail_instead_of_using_hidden_priority():
 
 def test_operation_specific_flags_are_not_silently_ignored():
     env = os.environ.copy()
-    env["TTS_API_KEY"] = "test-key"
+    env["LYCHEE_API_KEY"] = "test-key"
 
     result = run_client("--doctor", "--voice", "不应被忽略", env=env)
 
