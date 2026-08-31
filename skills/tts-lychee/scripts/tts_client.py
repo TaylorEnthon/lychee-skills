@@ -232,6 +232,7 @@ def run_doctor(args: argparse.Namespace) -> Dict[str, Any]:
         sys.version_info >= (3, 8),
         f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
     )
+    add("python executable", bool(sys.executable), str(Path(sys.executable).resolve()))
     websocket_installed = importlib.util.find_spec("websocket") is not None
     requests_installed = importlib.util.find_spec("requests") is not None
     add(
