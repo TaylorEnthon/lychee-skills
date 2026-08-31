@@ -42,7 +42,20 @@ SEGMENT_TEXT_LENGTH = 1000
 
 
 class TtsStreamError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        error_code: str = "stream_failed",
+        stage: str = "streaming",
+        retryable: bool = True,
+        partial_output: Optional[str] = None,
+    ):
+        super().__init__(message)
+        self.error_code = error_code
+        self.stage = stage
+        self.retryable = retryable
+        self.partial_output = partial_output
 
 
 @dataclass(frozen=True)
@@ -108,6 +121,22 @@ class StreamingTtsClient:
             text = str(payload or "").strip()
         return text[:500] or "TTS 流式合成失败"
 
+    @staticmethod
+    def _send_packet(
+        connection: Any,
+        event: int,
+        payload: Dict[str, Any],
+        session_id: Optional[str] = None,
+    ) -> None:
+        try:
+            send_packet(connection, event, payload, session_id)
+        except Exception as exc:
+            raise TtsStreamError(
+                "TTS WebSocket 发送失败",
+                error_code="transport_failed",
+                retryable=True,
+            ) from exc
+
     def stream(
         self,
         text: str,
@@ -117,10 +146,18 @@ class StreamingTtsClient:
     ) -> StreamResult:
         if websocket is None:
             raise TtsStreamError(
-                "缺少 websocket-client 依赖，请使用 Skill 启动脚本执行 --install-deps"
+                "缺少 websocket-client 依赖，请使用 Skill 启动脚本执行 --install-deps",
+                error_code="dependency_missing",
+                stage="setup",
+                retryable=False,
             )
         if not self.api_key:
-            raise TtsStreamError("TTS_API_KEY 未配置")
+            raise TtsStreamError(
+                "TTS_API_KEY 未配置",
+                error_code="authentication_missing",
+                stage="setup",
+                retryable=False,
+            )
         text = (text or "").strip()
         speaker_id = (speaker_id or "").strip()
         if not text:
@@ -160,11 +197,11 @@ class StreamingTtsClient:
             sink.close(True)
             opened = False
             return StreamResult(pcm.bytes_written, duration_ms, first_audio_ms, len(segments))
-        except Exception:
+        except BaseException:
             if opened:
                 try:
                     sink.close(False)
-                except Exception:
+                except BaseException:
                     pass
             raise
 
@@ -177,12 +214,52 @@ class StreamingTtsClient:
         emit: Callable[..., None],
         segment_index: int,
     ) -> Optional[int]:
+        received_before_attempt = pcm.received_bytes
+        for attempt in (1, 2):
+            try:
+                return self._stream_segment_once(
+                    text,
+                    speaker_id,
+                    pcm,
+                    overall_started,
+                    emit,
+                    segment_index,
+                    attempt,
+                )
+            except TtsStreamError as exc:
+                can_retry = (
+                    attempt == 1
+                    and exc.retryable
+                    and pcm.received_bytes == received_before_attempt
+                )
+                if not can_retry:
+                    raise
+                emit(
+                    "segment_retrying",
+                    segment=segment_index,
+                    attempt=2,
+                    max_attempts=2,
+                    error_code=exc.error_code,
+                    reason=str(exc),
+                )
+        raise AssertionError("unreachable")
+
+    def _stream_segment_once(
+        self,
+        text: str,
+        speaker_id: str,
+        pcm: PcmStream,
+        overall_started: float,
+        emit: Callable[..., None],
+        segment_index: int,
+        attempt: int,
+    ) -> Optional[int]:
         session_id = uuid.uuid4().hex
         connection = None
         got_audio = False
         first_audio_ms: Optional[int] = None
         try:
-            emit("connecting", segment=segment_index)
+            emit("connecting", segment=segment_index, attempt=attempt)
             try:
                 connection = websocket.create_connection(
                     self.ws_url,
@@ -190,9 +267,15 @@ class StreamingTtsClient:
                     timeout=self.timeout,
                 )
             except Exception as exc:
-                raise TtsStreamError("TTS WebSocket 连接失败") from exc
+                raise TtsStreamError(
+                    "TTS WebSocket 连接失败",
+                    error_code="connection_failed",
+                    stage="connection",
+                    retryable=True,
+                ) from exc
 
-            send_packet(connection, EVENT_START_CONNECTION, {})
+            self._send_packet(connection, EVENT_START_CONNECTION, {})
+            last_meaningful_progress = time.monotonic()
             while True:
                 try:
                     raw = connection.recv()
@@ -200,29 +283,57 @@ class StreamingTtsClient:
                     timeout_error = getattr(websocket, "WebSocketTimeoutException", ())
                     if timeout_error and isinstance(exc, timeout_error):
                         raise TtsStreamError(
-                            f"TTS 流式连接超过 {self.timeout} 秒未收到数据"
+                            f"TTS 流式连接超过 {self.timeout} 秒未收到数据",
+                            error_code="stream_timeout",
+                            retryable=True,
                         ) from exc
-                    raise TtsStreamError("TTS WebSocket 接收失败") from exc
+                    raise TtsStreamError(
+                        "TTS WebSocket 接收失败",
+                        error_code="transport_failed",
+                        retryable=True,
+                    ) from exc
                 if raw is None or raw == b"":
-                    raise TtsStreamError("TTS WebSocket 提前关闭")
+                    raise TtsStreamError(
+                        "TTS WebSocket 提前关闭",
+                        error_code="transport_closed",
+                        retryable=True,
+                    )
+                received_at = time.monotonic()
+                if received_at - last_meaningful_progress >= self.timeout:
+                    raise TtsStreamError(
+                        f"TTS 流式连接超过 {self.timeout} 秒没有有效进展",
+                        error_code="progress_timeout",
+                        retryable=True,
+                    )
                 if isinstance(raw, str):
                     continue
                 try:
                     response = parse_response(raw)
                 except Exception as exc:
-                    raise TtsStreamError("TTS 响应协议解析失败") from exc
+                    raise TtsStreamError(
+                        "TTS 响应协议解析失败",
+                        error_code="protocol_error",
+                        retryable=False,
+                    ) from exc
 
                 message_type = response.get("message_type")
                 event = response.get("event")
                 payload = response.get("payload") or b""
                 if message_type == ERROR_INFORMATION:
                     raise TtsStreamError(
-                        f"TTS 服务错误 {response.get('error_code')}: {self._error_text(payload)}"
+                        f"TTS 服务错误 {response.get('error_code')}: {self._error_text(payload)}",
+                        error_code="provider_error",
+                        retryable=False,
                     )
                 if event in (EVENT_CONNECTION_FAILED, EVENT_SESSION_FAILED):
-                    raise TtsStreamError(f"TTS 会话失败 ({event}): {self._error_text(payload)}")
+                    raise TtsStreamError(
+                        f"TTS 会话失败 ({event}): {self._error_text(payload)}",
+                        error_code="provider_session_failed",
+                        retryable=False,
+                    )
                 if event == EVENT_CONNECTION_STARTED:
-                    send_packet(
+                    last_meaningful_progress = received_at
+                    self._send_packet(
                         connection,
                         EVENT_START_SESSION,
                         {
@@ -237,16 +348,18 @@ class StreamingTtsClient:
                     )
                     emit("session_starting", segment=segment_index)
                 elif event == EVENT_SESSION_STARTED:
-                    send_packet(
+                    last_meaningful_progress = received_at
+                    self._send_packet(
                         connection,
                         EVENT_TASK_REQUEST,
                         {"event": EVENT_TASK_REQUEST, "text": text},
                         session_id,
                     )
-                    send_packet(connection, EVENT_FINISH_SESSION, {}, session_id)
+                    self._send_packet(connection, EVENT_FINISH_SESSION, {}, session_id)
                     emit("text_sent", segment=segment_index)
                 elif event == EVENT_TTS_RESPONSE:
                     if message_type == AUDIO_ONLY_RESPONSE and payload:
+                        last_meaningful_progress = received_at
                         pcm.write(payload)
                         got_audio = True
                         if first_audio_ms is None:
@@ -258,10 +371,15 @@ class StreamingTtsClient:
                                 bytes=pcm.bytes_written,
                             )
                 elif event == EVENT_SESSION_FINISHED:
-                    send_packet(connection, EVENT_FINISH_CONNECTION, {})
+                    last_meaningful_progress = received_at
+                    self._send_packet(connection, EVENT_FINISH_CONNECTION, {})
                 elif event == EVENT_CONNECTION_FINISHED:
                     if not got_audio:
-                        raise TtsStreamError("TTS 会话完成但没有音频")
+                        raise TtsStreamError(
+                            "TTS 会话完成但没有音频",
+                            error_code="no_audio",
+                            retryable=True,
+                        )
                     emit("connection_finished", segment=segment_index)
                     return first_audio_ms
         finally:

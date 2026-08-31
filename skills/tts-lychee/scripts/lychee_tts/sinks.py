@@ -326,10 +326,13 @@ class PcmStream:
     def __init__(self, sink: AudioSink):
         self.sink = sink
         self._carry = b""
+        self.received_bytes = 0
         self.bytes_written = 0
 
     def write(self, chunk: bytes) -> None:
-        data = self._carry + bytes(chunk)
+        incoming = bytes(chunk)
+        self.received_bytes += len(incoming)
+        data = self._carry + incoming
         usable = len(data) - (len(data) % 2)
         self._carry = data[usable:]
         if usable:

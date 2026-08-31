@@ -158,3 +158,39 @@ def test_queued_sink_does_not_block_the_producer_on_a_slow_write():
     producer.join(timeout=1)
     sink.close(True)
     assert received == [b"\x01\x00", b"\x02\x00"]
+
+
+def test_queued_sink_discards_pending_chunks_when_cancelled():
+    write_started = threading.Event()
+    release_write = threading.Event()
+    close_finished = threading.Event()
+    received = []
+    closed_with = []
+
+    class SlowSink:
+        def open(self):
+            pass
+
+        def write(self, chunk):
+            write_started.set()
+            assert release_write.wait(timeout=2)
+            received.append(bytes(chunk))
+
+        def close(self, success):
+            closed_with.append(success)
+
+    sink = sinks_module.QueuedSink(SlowSink(), max_chunks=2)
+    sink.open()
+    sink.write(b"\x01\x00")
+    assert write_started.wait(timeout=1)
+    sink.write(b"\x02\x00")
+
+    closer = threading.Thread(target=lambda: (sink.close(False), close_finished.set()))
+    closer.start()
+    assert not close_finished.wait(timeout=0.1)
+    release_write.set()
+    assert close_finished.wait(timeout=1)
+    closer.join(timeout=1)
+
+    assert received == [b"\x01\x00"]
+    assert closed_with == [False]

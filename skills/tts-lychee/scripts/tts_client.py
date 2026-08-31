@@ -272,13 +272,12 @@ def run_speak(args: argparse.Namespace) -> Dict[str, Any]:
     if output_path.suffix.lower() != ".wav":
         raise ValueError("真流式模式输出必须使用 .wav 文件")
 
-    sinks = [
-        WaveFileSink(
-            output_path,
-            overwrite=args.overwrite,
-            preserve_on_failure=True,
-        )
-    ]
+    wave_sink = WaveFileSink(
+        output_path,
+        overwrite=args.overwrite,
+        preserve_on_failure=True,
+    )
+    sinks = [wave_sink]
     warnings = []
     playback: Optional[BestEffortSink] = None
     if args.play:
@@ -289,11 +288,16 @@ def run_speak(args: argparse.Namespace) -> Dict[str, Any]:
             warnings.append("实时播放依赖或输出设备不可用，已改为只生成 WAV")
 
     stream_started = time.monotonic()
-    result = StreamingTtsClient(
-        api_key=os.getenv("TTS_API_KEY"),
-        ws_url=args.ws_url,
-        timeout=args.timeout,
-    ).stream(args.text, speaker_id, TeeSink(sinks), on_event=progress)
+    try:
+        result = StreamingTtsClient(
+            api_key=os.getenv("TTS_API_KEY"),
+            ws_url=args.ws_url,
+            timeout=args.timeout,
+        ).stream(args.text, speaker_id, TeeSink(sinks), on_event=progress)
+    except BaseException as exc:
+        if wave_sink.failure_path is not None and not getattr(exc, "partial_output", None):
+            exc.partial_output = str(wave_sink.failure_path.resolve())
+        raise
     total_duration_ms = int((time.monotonic() - operation_started) * 1000)
     played = bool(playback and playback.succeeded)
     if playback and playback.error is not None:
