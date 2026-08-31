@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import importlib
+import importlib.util
 from pathlib import Path
 
 import pytest
 
-from lychee_tts.api import PublicVoice, VoiceSelectionError
+from lychee_tts.api import LycheeApiError, PublicVoice, VoiceSelectionError
 from lychee_tts.registry import StoredVoice, VoiceRegistry
 from tts_client import build_parser, resolve_voice
+
+
+def load_voice_types():
+    spec = importlib.util.find_spec("lychee_tts.voices")
+    assert spec is not None, "lychee_tts.voices must own public/personal identity"
+    module = importlib.import_module("lychee_tts.voices")
+    return module.VoiceReference, module.VoiceResolver
 
 
 def test_saved_clone_voice_can_be_resolved_by_alias(tmp_path: Path):
@@ -108,3 +117,44 @@ def test_duplicate_personal_alias_requires_explicit_replacement(tmp_path: Path):
 
     assert replaced.speaker_id == "second-id"
     assert registry.get("我的声音").speaker_id == "second-id"
+
+
+def test_explicit_public_voice_skips_catalog_request(tmp_path: Path):
+    VoiceReference, VoiceResolver = load_voice_types()
+
+    class Api:
+        def resolve_public_voice(self, requested):
+            raise AssertionError("explicit public voice must not query the catalog")
+
+    reference = VoiceResolver(Api(), VoiceRegistry(tmp_path / "voices.json")).resolve(
+        public_name="靖轩",
+    )
+
+    assert reference == VoiceReference("靖轩", "靖轩", "public")
+
+
+def test_explicit_personal_voice_resolves_only_from_registry(tmp_path: Path):
+    VoiceReference, VoiceResolver = load_voice_types()
+    registry = VoiceRegistry(tmp_path / "voices.json")
+    registry.save(StoredVoice(alias="我的声音", speaker_id="clone-request"))
+
+    class Api:
+        def resolve_public_voice(self, requested):
+            raise AssertionError("explicit personal voice must not query the catalog")
+
+    reference = VoiceResolver(Api(), registry).resolve(personal_alias="我的声音")
+
+    assert reference == VoiceReference("我的声音", "clone-request", "personal")
+
+
+def test_catalog_outage_never_switches_legacy_public_name_to_personal_alias(tmp_path: Path):
+    _, VoiceResolver = load_voice_types()
+    registry = VoiceRegistry(tmp_path / "voices.json")
+    registry.save(StoredVoice(alias="靖轩", speaker_id="private-id"))
+
+    class Api:
+        def resolve_public_voice(self, requested):
+            raise LycheeApiError("catalog unavailable")
+
+    with pytest.raises(LycheeApiError, match="catalog unavailable"):
+        VoiceResolver(Api(), registry).resolve(legacy_name="靖轩")

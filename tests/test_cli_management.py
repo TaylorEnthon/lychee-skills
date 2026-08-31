@@ -45,6 +45,19 @@ def test_operation_specific_flags_are_not_silently_ignored():
     assert "朗读参数" in result.stderr
 
 
+def test_voice_selectors_are_explicit_and_mutually_exclusive():
+    result = run_client(
+        "--text", "你好",
+        "--voice", "旧入口",
+        "--public-voice", "明确公共音色",
+    )
+
+    assert result.returncode == 1
+    payload = json.loads(result.stderr)
+    assert payload["error_code"] == "invalid_arguments"
+    assert "只能指定一种音色" in payload["error"]
+
+
 def test_personal_voices_can_be_listed_without_exposing_speaker_ids(tmp_path: Path):
     registry = VoiceRegistry(tmp_path / "voices.json")
     registry.save(StoredVoice(

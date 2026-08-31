@@ -20,8 +20,6 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from lychee_tts.api import (  # noqa: E402
     LycheeApiClient,
-    LycheeApiError,
-    PublicVoice,
     VoiceSelectionError,
 )
 from lychee_tts.contracts import (  # noqa: E402
@@ -33,6 +31,7 @@ from lychee_tts.contracts import (  # noqa: E402
 from lychee_tts.registry import StoredVoice, VoiceRegistry  # noqa: E402
 from lychee_tts.sinks import BestEffortSink, PlaybackSink, TeeSink, WaveFileSink  # noqa: E402
 from lychee_tts.streaming import StreamingTtsClient  # noqa: E402
+from lychee_tts.voices import VoiceResolver  # noqa: E402
 
 
 def configure_stdio() -> None:
@@ -58,26 +57,14 @@ def build_api(args: argparse.Namespace) -> LycheeApiClient:
 
 
 def resolve_voice(args: argparse.Namespace, api: LycheeApiClient) -> Tuple[str, str, str]:
-    if args.speaker_id:
-        speaker_id = args.speaker_id.strip()
-        if not speaker_id:
-            raise ValueError("speaker_id 不能为空")
-        return args.voice or speaker_id, speaker_id, "custom"
-    requested = (args.voice or "").strip()
-    if not requested:
-        raise ValueError("请指定 --voice；可先使用 --list-voices 查询实时公共音色")
-    stored = VoiceRegistry(args.registry).get(requested)
-    try:
-        voice = api.resolve_public_voice(requested)
-    except VoiceSelectionError as exc:
-        if exc.candidates or not stored:
-            raise
-        return stored.alias, stored.speaker_id, "custom"
-    except LycheeApiError:
-        if not stored:
-            raise
-        return stored.alias, stored.speaker_id, "custom"
-    return voice.name, voice.name, "public"
+    reference = VoiceResolver(api, VoiceRegistry(args.registry)).resolve(
+        public_name=args.public_voice,
+        personal_alias=args.personal_voice,
+        legacy_name=args.voice,
+        speaker_id=args.speaker_id,
+    )
+    output_kind = "custom" if reference.kind == "personal" else reference.kind
+    return reference.display_name, reference.speaker_id, output_kind
 
 
 def run_list_voices(args: argparse.Namespace) -> Dict[str, Any]:
@@ -341,6 +328,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--confirm-rename", action="store_true")
     parser.add_argument("--text")
     parser.add_argument("--voice", help="实时公共音色名称或已保存的个人音色别名")
+    parser.add_argument("--public-voice", help="已确认的实时公共音色名称")
+    parser.add_argument("--personal-voice", help="已保存的个人音色别名")
     parser.add_argument("--speaker-id", help=argparse.SUPPRESS)
     parser.add_argument("--output")
     parser.add_argument("--play", action="store_true")
@@ -406,6 +395,8 @@ def select_operation(args: argparse.Namespace) -> str:
         raise ValueError("克隆参数只能与 --clone-audio 或 --clone-url 一起使用")
     speak_modifiers = (
         args.voice,
+        args.public_voice,
+        args.personal_voice,
         args.speaker_id,
         args.output,
         args.play,
